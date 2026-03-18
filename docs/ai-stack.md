@@ -19,11 +19,6 @@ AIServer (128 GB RAM, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │   ├── PyTorch + ROCm
 │   └── Full scientific Python stack
 │
-├── LXC 106 — "ai-detector" (AI Detection Research)
-│   ├── Transformers, spaCy
-│   ├── XGBoost, LightGBM
-│   └── GPT-2, DeBERTa models
-│
 └── LXC 100 — "media-monitor" (Health Agent)
     ├── Ollama (small model for reasoning)
     └── Automated health check + remediation
@@ -93,24 +88,6 @@ pip install torch --index-url https://rocm.nightlies.amd.com/v2/gfx1151/
 - 48 GB RAM, 32 vCPUs
 
 ---
-
-## AI Detection Research (LXC 106)
-
-Dedicated environment for AI text detection and humanization research.
-
-### Setup
-
-- **Models**: GPT-2 (perplexity baseline), DeBERTa (classification)
-- **Frameworks**: PyTorch (CPU), Transformers, XGBoost, LightGBM, spaCy
-- **Dataset**: HC3 (Human ChatGPT Comparison Corpus)
-- **Goal**: Local AI text detector rivaling commercial solutions
-
-### Bootstrap
-
-```bash
-# Download base models and dataset
-~/ai-detector/setup-models.sh
-```
 
 ---
 

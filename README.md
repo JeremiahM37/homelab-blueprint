@@ -30,19 +30,12 @@ This repo documents the architecture, services, and lessons learned. No credenti
 │  └────────────┘  │                      │  ├───────────────────┤   │
 │                  │                      │  │ LXC 102           │   │
 │  * Only GPU in   │  DAS: 8TB btrfs      │  │ LLM Chat (Ollama) │   │
-│    system —      │  (USB TerraMaster)   │  │ 32c/40GB          │   │
+│    system —      │  (USB TerraMaster)   │  │ 32c/80GB          │   │
 │    host goes     │                      │  ├───────────────────┤   │
-│    headless      │                      │  │ LXC 104           │   │
-│    when VM runs  │                      │  │ Work Env / Tools  │   │
-│                  │                      │  ├───────────────────┤   │
-│                  │                      │  │ LXC 105           │   │
-│                  │                      │  │ Research Env      │   │
+│    headless      │                      │  │ LXC 105           │   │
+│    when VM runs  │                      │  │ Research Env      │   │
 │                  │                      │  │ GPU passthrough   │   │
 │                  │                      │  │ 32c/48GB          │   │
-│                  │                      │  ├───────────────────┤   │
-│                  │                      │  │ LXC 106           │   │
-│                  │                      │  │ AI Detector Lab   │   │
-│                  │                      │  │ 8c/32GB           │   │
 │                  │                      │  └───────────────────┘   │
 └──────────────────┴──────────────────────┴───────────────────────────┘
 ```
@@ -88,7 +81,7 @@ Internet
         │                 └── Gamarr
         │
         └── AIServer node
-              ├── LXC 100-106 — bridged LAN
+              ├── LXC 100-105 — bridged LAN
               └── MCP server (Proxmox management)
 ```
 
@@ -104,11 +97,9 @@ Download clients (qBittorrent, BookBounty, Gamarr) route through a **gluetun** c
 |------|------|------|------|-----------|---------|
 | 100 | media-monitor | AIServer | LXC | 4c / 16 GB | Automated health monitoring agent |
 | 101 | project-env | AIServer | LXC | 4c / 8 GB | Development workspace |
-| 102 | openclaw | AIServer | LXC | 16c / 40 GB | Local LLM chat (Ollama + Open-WebUI) |
+| 102 | openclaw | AIServer | LXC | 16c / 80 GB | Local LLM chat (Ollama + Open-WebUI) |
 | 103 | gaming-bazzite | pve | VM | 7c / 28 GB | Gaming VM with GPU passthrough |
-| 104 | work-env | AIServer | LXC | 4c / 12 GB | CLI tools / sandbox |
 | 105 | research-env | AIServer | LXC | 32c / 48 GB | AI/ML research with GPU passthrough |
-| 106 | ai-detector | AIServer | LXC | 8c / 32 GB | AI text detection research |
 | 200 | docker-server | MediaServer | LXC | 12c / 24 GB | Main Docker host (35+ containers) |
 
 ---
@@ -131,7 +122,7 @@ Download clients (qBittorrent, BookBounty, Gamarr) route through a **gluetun** c
 
 ## Quick Stats
 
-- **8 guests** across 3 nodes (7 LXC + 1 VM)
+- **6 guests** across 3 nodes (5 LXC + 1 VM)
 - **35+ Docker containers** on a single LXC
 - **~168 GB total RAM** across the cluster
 - **8 TB DAS** for media storage

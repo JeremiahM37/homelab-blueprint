@@ -23,7 +23,7 @@ Flat LAN with VPN for download clients, Tailscale mesh for stable inter-node acc
     │  ┌──────────┐   ┌──────────────┐   ┌────────────────┐  │
     │  │   pve    │   │ MediaServer  │   │   AIServer     │  │
     │  │          │   │              │   │                │  │
-    │  │  VM 103  │   │   LXC 200   │   │ LXC 100-106   │  │
+    │  │  VM 103  │   │   LXC 200   │   │ LXC 100-105   │  │
     │  │(bridged) │   │  (bridged)  │   │  (bridged)     │  │
     │  └──────────┘   └──────────────┘   └────────────────┘  │
     │                                                          │
