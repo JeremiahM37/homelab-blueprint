@@ -65,7 +65,7 @@ All download traffic routes through a Mullvad WireGuard VPN via the gluetun cont
 qbittorrent:
   network_mode: "service:gluetun"
 
-bookbounty:
+librarr:
   network_mode: "service:gluetun"
 
 gamarr:
@@ -85,7 +85,7 @@ Since VPN'd containers share gluetun's network namespace, ports are mapped on gl
 gluetun:
   ports:
     - "8080:8080"    # qBittorrent WebUI
-    - "5050:5050"    # BookBounty
+    - "5050:5050"    # Librarr
     - "5057:5001"    # Gamarr (note: different host vs container port)
     - "8001:8000"    # Gluetun control API
 ```

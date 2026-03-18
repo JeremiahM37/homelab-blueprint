@@ -31,7 +31,7 @@ services:
     ports:
       # Ports for containers using gluetun's network
       - "8080:8080"    # qBittorrent
-      - "5050:5050"    # BookBounty
+      - "5050:5050"    # Librarr
       - "5057:5001"    # Gamarr
       - "8001:8000"    # Gluetun control API
     dns_search:
@@ -264,10 +264,10 @@ services:
       - internal
     restart: unless-stopped
 
-  # BookBounty runs inside gluetun network (see gluetun ports)
-  bookbounty:
+  # Librarr runs inside gluetun network (see gluetun ports)
+  librarr:
     build: ./librarr
-    container_name: bookbounty
+    container_name: librarr
     network_mode: "service:gluetun"
     volumes:
       - ./librarr:/app

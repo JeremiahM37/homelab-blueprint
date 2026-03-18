@@ -77,7 +77,7 @@ Internet
         │     └── LXC 200 — bridged LAN
         │           └── gluetun VPN (Mullvad WireGuard)
         │                 ├── qBittorrent
-        │                 ├── BookBounty
+        │                 ├── Librarr
         │                 └── Gamarr
         │
         └── AIServer node
@@ -87,7 +87,7 @@ Internet
 
 ### VPN Architecture
 
-Download clients (qBittorrent, BookBounty, Gamarr) route through a **gluetun** container running Mullvad WireGuard. Services that need VPN protection use `network_mode: "service:gluetun"` in Docker Compose and expose their ports through gluetun.
+Download clients (qBittorrent, Librarr, Gamarr) route through a **gluetun** container running Mullvad WireGuard. Services that need VPN protection use `network_mode: "service:gluetun"` in Docker Compose and expose their ports through gluetun.
 
 ---
 

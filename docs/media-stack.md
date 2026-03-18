@@ -43,7 +43,7 @@ User Request                Search & Download              Organize & Serve
 
 ```
 ┌──────────┐    ┌───────────┐    ┌──────────┐
-│ Shelfarr │───▶│BookBounty │───▶│ qBit /   │
+│ Shelfarr │───▶│ Librarr   │───▶│ qBit /   │
 │(wishlist)│    │(search +  │    │ DDL      │
 └──────────┘    │ download) │    └────┬─────┘
                 └───────────┘         │
@@ -57,8 +57,8 @@ User Request                Search & Download              Organize & Serve
                 └──────────┴───────────┴───────────┘
 ```
 
-- **Shelfarr** — Track wanted books, send to BookBounty
-- **BookBounty (Librarr)** — Custom Flask app that searches multiple sources (Anna's Archive, LibGen, Gutenberg, Open Library, Librivox)
+- **Shelfarr** — Track wanted books, send to Librarr
+- **Librarr** — Custom Flask app that searches multiple sources (Anna's Archive, LibGen, Gutenberg, Open Library, Librivox)
 - **Post-download**: Organize files → import to appropriate library → track in SQLite
 
 ### Book Sources

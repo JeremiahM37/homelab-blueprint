@@ -25,8 +25,8 @@ All services run on a single privileged LXC container (12 cores, 24 GB RAM) usin
 | **audiobookshelf** | 13378 | Audiobook + podcast server | OPDS support |
 | **calibre-web** | 8083 | Ebook library (OPDS) | Backed by Calibre database |
 | **kavita** | 5005 | Comic / manga reader | Separate from ebook library |
-| **shelfarr** | 5056 | Book wishlist + tracker | Tracks wanted books, sends to BookBounty |
-| **bookbounty** | 5050 | Book search + download | Custom Flask app (via VPN) |
+| **shelfarr** | 5056 | Book wishlist + tracker | Tracks wanted books, sends to Librarr |
+| **librarr** | 5050 | Book search + download | Custom Flask app (via VPN) |
 | **lncrawl** | — | Web novel scraper | Batch job, no persistent port |
 
 ### Games
@@ -97,7 +97,7 @@ gluetun:
   image: qmcgaw/gluetun
   ports:
     - "8080:8080"   # qBittorrent
-    - "5050:5050"   # BookBounty
+    - "5050:5050"   # Librarr
     - "5057:5001"   # Gamarr (host:container port mapping)
 
 qbittorrent:
