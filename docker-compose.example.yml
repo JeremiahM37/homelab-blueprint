@@ -1,0 +1,655 @@
+# Docker Compose — Homelab Media & Services Stack
+# Sanitized example — replace all <PLACEHOLDER> values with your own
+#
+# Run on a dedicated Docker host (LXC or VM) with:
+#   - 12+ cores, 24+ GB RAM recommended
+#   - External storage mounted for media files
+#   - VPN provider account (Mullvad, PIA, etc.)
+
+networks:
+  proxy:
+    driver: bridge
+  internal:
+    driver: bridge
+
+# ============================================================
+# VPN + Download Clients
+# ============================================================
+
+services:
+  gluetun:
+    image: qmcgaw/gluetun
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - VPN_SERVICE_PROVIDER=mullvad
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=<YOUR_VPN_PRIVATE_KEY>
+      - WIREGUARD_ADDRESSES=<YOUR_VPN_ADDRESS>/32
+      - SERVER_COUNTRIES=<YOUR_PREFERRED_COUNTRY>
+    ports:
+      # Ports for containers using gluetun's network
+      - "8080:8080"    # qBittorrent
+      - "5050:5050"    # BookBounty
+      - "5057:5001"    # Gamarr
+      - "8001:8000"    # Gluetun control API
+    dns_search:
+      - ""  # Prevent host DNS search domain leaking
+    networks:
+      - proxy
+      - internal
+    restart: unless-stopped
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=<YOUR_TIMEZONE>
+    volumes:
+      - ./qbittorrent:/config
+      - /data/media:/data/media
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+
+  unpackerr:
+    image: golift/unpackerr
+    container_name: unpackerr
+    environment:
+      - UN_SONARR_0_URL=http://sonarr:8989
+      - UN_SONARR_0_API_KEY=<SONARR_API_KEY>
+      - UN_RADARR_0_URL=http://radarr:7878
+      - UN_RADARR_0_API_KEY=<RADARR_API_KEY>
+    volumes:
+      - /data/media:/data/media
+    networks:
+      - internal
+    restart: unless-stopped
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    environment:
+      - LOG_LEVEL=info
+    networks:
+      - internal
+    restart: unless-stopped
+
+  # ============================================================
+  # Media Automation (*arr stack)
+  # ============================================================
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=<YOUR_TIMEZONE>
+    volumes:
+      - ./prowlarr:/config
+    ports:
+      - "9696:9696"
+    networks:
+      - proxy
+      - internal
+    restart: unless-stopped
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=<YOUR_TIMEZONE>
+    volumes:
+      - ./sonarr:/config
+      - /data/media:/data/media
+    ports:
+      - "8989:8989"
+    networks:
+      - proxy
+      - internal
+    restart: unless-stopped
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=<YOUR_TIMEZONE>
+    volumes:
+      - ./radarr:/config
+      - /data/media:/data/media
+    ports:
+      - "7878:7878"
+    networks:
+      - proxy
+      - internal
+    restart: unless-stopped
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=<YOUR_TIMEZONE>
+    volumes:
+      - ./bazarr:/config
+      - /data/media:/data/media
+    ports:
+      - "6767:6767"
+    networks:
+      - proxy
+      - internal
+    restart: unless-stopped
+
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    environment:
+      - TZ=<YOUR_TIMEZONE>
+    volumes:
+      - ./jellyseerr:/app/config
+    ports:
+      - "5055:5055"
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  # ============================================================
+  # Media Servers
+  # ============================================================
+
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=<YOUR_TIMEZONE>
+    volumes:
+      - ./jellyfin:/config
+      - /data/media:/data/media
+    ports:
+      - "8096:8096"
+    devices:
+      - /dev/dri:/dev/dri  # GPU for hardware transcoding
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  tdarr:
+    image: ghcr.io/haveagitgat/tdarr:latest
+    container_name: tdarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=<YOUR_TIMEZONE>
+    volumes:
+      - ./tdarr/server:/app/server
+      - ./tdarr/configs:/app/configs
+      - ./tdarr/logs:/app/logs
+      - /data/media:/data/media
+      - /tmp/tdarr:/temp
+    ports:
+      - "8265:8265"
+    devices:
+      - /dev/dri:/dev/dri  # GPU for hardware transcoding
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  # ============================================================
+  # Books & Reading
+  # ============================================================
+
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:latest
+    container_name: audiobookshelf
+    volumes:
+      - ./audiobookshelf:/config
+      - /data/media/books/audiobooks:/audiobooks
+      - /data/media/podcasts:/podcasts
+    ports:
+      - "13378:80"
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  calibre-web:
+    image: lscr.io/linuxserver/calibre-web:latest
+    container_name: calibre-web
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=<YOUR_TIMEZONE>
+    volumes:
+      - ./calibre-web:/config
+      - /data/media/books/ebooks:/books
+    ports:
+      - "8083:8083"
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  kavita:
+    image: jvmilazz0/kavita:latest
+    container_name: kavita
+    volumes:
+      - ./kavita:/kavita/config
+      - /data/media/books/comics:/comics
+      - /data/media/books/manga:/manga
+    ports:
+      - "5005:5000"
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  shelfarr:
+    image: shelfarr/shelfarr:latest
+    container_name: shelfarr
+    volumes:
+      - ./shelfarr:/config
+    ports:
+      - "5056:5056"
+    networks:
+      - proxy
+      - internal
+    restart: unless-stopped
+
+  # BookBounty runs inside gluetun network (see gluetun ports)
+  bookbounty:
+    build: ./librarr
+    container_name: bookbounty
+    network_mode: "service:gluetun"
+    volumes:
+      - ./librarr:/app
+      - /data/media/books/ebooks/incoming:/books-incoming
+      - /data/media/books/audiobooks:/audiobooks-incoming
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+
+  # ============================================================
+  # Games
+  # ============================================================
+
+  # Gamarr runs inside gluetun network (see gluetun ports)
+  gamarr:
+    build: ./gamarr
+    container_name: gamarr
+    network_mode: "service:gluetun"
+    volumes:
+      - ./gamarr:/app
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+
+  gamevault:
+    image: phalcode/gamevault-backend:latest
+    container_name: gamevault-backend
+    environment:
+      - DB_HOST=gamevault-db
+      - DB_USERNAME=<DB_USER>
+      - DB_PASSWORD=<DB_PASSWORD>
+    volumes:
+      - /data/media/games/vault:/files
+    ports:
+      - "8087:8080"
+    depends_on:
+      - gamevault-db
+    networks:
+      - proxy
+      - internal
+    restart: unless-stopped
+
+  gamevault-db:
+    image: postgres:16-alpine
+    container_name: gamevault-db
+    environment:
+      - POSTGRES_USER=<DB_USER>
+      - POSTGRES_PASSWORD=<DB_PASSWORD>
+      - POSTGRES_DB=gamevault
+    volumes:
+      - ./gamevault-db:/var/lib/postgresql/data
+    networks:
+      - internal
+    restart: unless-stopped
+
+  romm:
+    image: rommapp/romm:latest
+    container_name: romm
+    environment:
+      - DB_HOST=romm-db
+      - DB_NAME=romm
+      - DB_USER=<DB_USER>
+      - DB_PASSWD=<DB_PASSWORD>
+    volumes:
+      - ./romm/resources:/romm/resources
+      - ./romm/redis:/redis-data
+      - /data/media/games/roms:/romm/library
+    ports:
+      - "8086:8080"
+    depends_on:
+      - romm-db
+    networks:
+      - proxy
+      - internal
+    restart: unless-stopped
+
+  romm-db:
+    image: mariadb:lts
+    container_name: romm-db
+    environment:
+      - MYSQL_ROOT_PASSWORD=<DB_ROOT_PASSWORD>
+      - MYSQL_DATABASE=romm
+      - MYSQL_USER=<DB_USER>
+      - MYSQL_PASSWORD=<DB_PASSWORD>
+    volumes:
+      - ./romm-db:/var/lib/mysql
+    networks:
+      - internal
+    restart: unless-stopped
+
+  # ============================================================
+  # Productivity & Tools
+  # ============================================================
+
+  paperless:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    container_name: paperless
+    environment:
+      - PAPERLESS_REDIS=redis://paperless-redis:6379
+      - PAPERLESS_SECRET_KEY=<RANDOM_SECRET>
+      - USERMAP_UID=1000
+      - USERMAP_GID=1000
+    volumes:
+      - ./paperless/data:/usr/src/paperless/data
+      - ./paperless/media:/usr/src/paperless/media
+      - ./paperless/consume:/usr/src/paperless/consume
+    ports:
+      - "8000:8000"
+    depends_on:
+      - paperless-redis
+    networks:
+      - proxy
+      - internal
+    restart: unless-stopped
+
+  paperless-redis:
+    image: redis:7-alpine
+    container_name: paperless-redis
+    networks:
+      - internal
+    restart: unless-stopped
+
+  mealie:
+    image: ghcr.io/mealie-recipes/mealie:latest
+    container_name: mealie
+    volumes:
+      - ./mealie:/app/data
+    ports:
+      - "9925:9000"
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  homebox:
+    image: ghcr.io/sysadminsmedia/homebox:latest
+    container_name: homebox
+    volumes:
+      - ./homebox:/data
+    ports:
+      - "7745:7745"
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  linkwarden:
+    image: ghcr.io/linkwarden/linkwarden:latest
+    container_name: linkwarden
+    environment:
+      - DATABASE_URL=postgresql://<DB_USER>:<DB_PASSWORD>@linkwarden-db:5432/linkwarden
+      - NEXTAUTH_SECRET=<RANDOM_SECRET>
+      - NEXTAUTH_URL=http://localhost:3050
+    volumes:
+      - ./linkwarden:/data/data
+    ports:
+      - "3050:3000"
+    depends_on:
+      - linkwarden-db
+    networks:
+      - proxy
+      - internal
+    restart: unless-stopped
+
+  linkwarden-db:
+    image: postgres:16-alpine
+    container_name: linkwarden-db
+    environment:
+      - POSTGRES_USER=<DB_USER>
+      - POSTGRES_PASSWORD=<DB_PASSWORD>
+      - POSTGRES_DB=linkwarden
+    volumes:
+      - ./linkwarden-db:/var/lib/postgresql/data
+    networks:
+      - internal
+    restart: unless-stopped
+
+  changedetection:
+    image: ghcr.io/dgtlmoon/changedetection.io:latest
+    container_name: changedetection
+    volumes:
+      - ./changedetection:/datastore
+    ports:
+      - "5100:5000"
+    depends_on:
+      - browser-chrome
+    networks:
+      - proxy
+      - internal
+    restart: unless-stopped
+
+  browser-chrome:
+    image: browserless/chrome:latest
+    container_name: browser-chrome
+    networks:
+      - internal
+    restart: unless-stopped
+
+  stirling-pdf:
+    image: frooodle/s-pdf:latest
+    container_name: stirling-pdf
+    volumes:
+      - ./stirling-pdf:/usr/share/tessdata
+    ports:
+      - "8084:8080"
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  it-tools:
+    image: corentinth/it-tools:latest
+    container_name: it-tools
+    ports:
+      - "8085:80"
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  # ============================================================
+  # Infrastructure & Monitoring
+  # ============================================================
+
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    volumes:
+      - ./homepage:/app/config
+    ports:
+      - "3000:3000"
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptime-kuma
+    volumes:
+      - ./uptime-kuma:/app/data
+    ports:
+      - "3001:3001"
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=<N8N_USER>
+      - N8N_BASIC_AUTH_PASSWORD=<N8N_PASSWORD>
+    volumes:
+      - ./n8n:/home/node/.n8n
+      - /usr/bin/docker:/usr/local/bin/docker:ro
+    ports:
+      - "5678:5678"
+    group_add:
+      - "996"  # Docker group GID — adjust for your system
+    networks:
+      - proxy
+      - internal
+    restart: unless-stopped
+
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy
+    container_name: docker-socket-proxy
+    environment:
+      - CONTAINERS=1
+      - POST=1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "2375:2375"
+    networks:
+      - internal
+    restart: unless-stopped
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    volumes:
+      - ./portainer:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "9000:9000"
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    volumes:
+      - ./grafana:/var/lib/grafana
+    ports:
+      - "3060:3000"
+    networks:
+      - proxy
+      - internal
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus:/etc/prometheus
+    networks:
+      - internal
+    restart: unless-stopped
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    networks:
+      - internal
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    networks:
+      - internal
+    restart: unless-stopped
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_SCHEDULE=0 0 4 * * *  # 4 AM daily
+    restart: unless-stopped
+
+  autoheal:
+    image: willfarrell/autoheal
+    container_name: autoheal
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=all
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  crowdsec:
+    image: crowdsecurity/crowdsec:latest
+    container_name: crowdsec
+    volumes:
+      - ./crowdsec:/etc/crowdsec
+      - /var/log:/var/log:ro
+    networks:
+      - internal
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=<YOUR_CLOUDFLARE_TUNNEL_TOKEN>
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  pulse:
+    image: ghcr.io/pulseco/pulse:latest
+    container_name: pulse
+    ports:
+      - "7655:7655"
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  discord-bot:
+    image: your-discord-bot:latest
+    container_name: discord-bot
+    environment:
+      - DISCORD_TOKEN=<YOUR_DISCORD_BOT_TOKEN>
+    ports:
+      - "3003:3003"
+    networks:
+      - proxy
+    restart: unless-stopped
