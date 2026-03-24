@@ -28,14 +28,14 @@ This repo documents the architecture, services, and lessons learned. No credenti
 │  │ GPU pass-  │  │  └────────────────┘  │  │ LXC 101           │   │
 │  │ through    │  │                      │  │ Dev Workspace     │   │
 │  └────────────┘  │                      │  ├───────────────────┤   │
-│                  │                      │  │ LXC 102           │   │
-│  * Only GPU in   │  DAS: 8TB btrfs      │  │ LLM Chat (Ollama) │   │
-│    system —      │  (USB TerraMaster)   │  │ 32c/80GB          │   │
-│    host goes     │                      │  ├───────────────────┤   │
-│    headless      │                      │  │ LXC 105           │   │
-│    when VM runs  │                      │  │ Research Env      │   │
-│                  │                      │  │ GPU passthrough   │   │
-│                  │                      │  │ 32c/48GB          │   │
+│                  │                      │  │ LXC 102  Ollama   │   │
+│  * Only GPU in   │  DAS: 8TB btrfs      │  │ LXC 104  Work     │   │
+│    system —      │  (USB TerraMaster)   │  │ LXC 105  Research │   │
+│    host goes     │                      │  │ LXC 106  AI Det.  │   │
+│    headless      │                      │  ├───────────────────┤   │
+│    when VM runs  │                      │  │ Homelab API :9105 │   │
+│                  │                      │  │ Doc RAG     :9103 │   │
+│                  │                      │  │ Terraform   :9104 │   │
 │                  │                      │  └───────────────────┘   │
 └──────────────────┴──────────────────────┴───────────────────────────┘
 ```
@@ -95,12 +95,14 @@ Download clients (qBittorrent, Librarr, Gamarr) route through a **gluetun** cont
 
 | VMID | Name | Node | Type | Resources | Purpose |
 |------|------|------|------|-----------|---------|
-| 100 | media-monitor | AIServer | LXC | 4c / 16 GB | Automated health monitoring agent |
-| 101 | project-env | AIServer | LXC | 4c / 8 GB | Development workspace |
-| 102 | openclaw | AIServer | LXC | 16c / 80 GB | Local LLM chat (Ollama + Open-WebUI) |
-| 103 | gaming-bazzite | pve | VM | 7c / 28 GB | Gaming VM with GPU passthrough |
-| 105 | research-env | AIServer | LXC | 32c / 48 GB | AI/ML research with GPU passthrough |
-| 200 | docker-server | MediaServer | LXC | 12c / 24 GB | Main Docker host (35+ containers) |
+| 100 | media-monitor | AIServer | LXC | 4c / 8 GB | AI self-healing health agent |
+| 101 | project-env | AIServer | LXC | 4c / 4 GB | Development workspace |
+| 102 | openclaw | AIServer | LXC | 16c / 28 GB | Local LLM chat (Ollama + Open-WebUI) |
+| 103 | gaming-bazzite | pve | VM | 7c / 24 GB | Gaming VM with GPU passthrough |
+| 104 | work-env | AIServer | LXC | 4c / 4 GB | Claude Code, Docker, dev tools |
+| 105 | research-env | AIServer | LXC | 16c / 16 GB | AI/ML research with GPU passthrough |
+| 106 | ai-detector | AIServer | LXC | 8c / 12 GB | AI text detection research |
+| 200 | docker-server | MediaServer | LXC | 12c / 24 GB | Main Docker host (55+ containers) |
 
 ---
 
@@ -108,11 +110,12 @@ Download clients (qBittorrent, Librarr, Gamarr) route through a **gluetun** cont
 
 | Doc | Description |
 |-----|-------------|
-| [Docker Services](docs/docker-services.md) | All 35+ containers running on LXC 200 |
+| [Docker Services](docs/docker-services.md) | All 55+ containers running on LXC 200 |
 | [Gaming VM](docs/gaming-vm.md) | Bazzite setup, GPU passthrough, Sunshine/Moonlight streaming |
 | [Game Pipeline](docs/game-pipeline.md) | Automated game download → install → Steam library pipeline |
-| [AI Stack](docs/ai-stack.md) | Ollama, Open-WebUI, research environments, GPU passthrough |
-| [Monitoring](docs/monitoring.md) | n8n watchdog workflows, media-monitor agent, Uptime Kuma |
+| [AI Stack](docs/ai-stack.md) | Ollama, Open-WebUI, Discord AI bot, RAG, unified API |
+| [Automation](docs/automation.md) | Discord AI bot, media-monitor, backups, CrowdSec, Terraform |
+| [Monitoring](docs/monitoring.md) | n8n watchdog workflows, media-monitor agent, Homepage dashboard |
 | [Media Stack](docs/media-stack.md) | Jellyfin, *arr apps, download automation |
 | [Networking](docs/networking.md) | VPN, Cloudflare tunnel, Tailscale mesh |
 | [Lessons Learned](docs/lessons-learned.md) | Gotchas, debugging tips, things that broke |
@@ -122,12 +125,18 @@ Download clients (qBittorrent, Librarr, Gamarr) route through a **gluetun** cont
 
 ## Quick Stats
 
-- **6 guests** across 3 nodes (5 LXC + 1 VM)
-- **35+ Docker containers** on a single LXC
-- **~168 GB total RAM** across the cluster
+- **8 guests** across 3 nodes (7 LXC + 1 VM)
+- **55+ Docker containers** on a single LXC
+- **~188 GB total RAM** across the cluster
 - **8 TB DAS** for media storage
-- **GPU passthrough** on 2 nodes (NVIDIA for gaming, AMD for ML)
-- **Automated pipelines** for media, games, ROMs, books, and health monitoring
+- **GPU passthrough** on 2 nodes (NVIDIA for gaming, AMD iGPU shared across 3 LXCs for ML)
+- **Discord AI bot** — natural language control of 30+ actions across 15 services (local LLM, zero cloud cost)
+- **Unified API** — single FastAPI endpoint aggregating all services (Swagger docs included)
+- **Document RAG** — vector search over 169+ documents via local embeddings + LLM
+- **Automated backups** — Restic to DAS, 3 nodes, daily, encrypted, deduplicated
+- **CrowdSec IPS** — 1400+ malicious IPs blocked at firewall, community threat intel
+- **Terraform IaC** — entire cluster defined as code, importable state
+- **AI self-healing** — media-monitor agent auto-fixes containers, torrents, VPN, permissions
 - **Zero cloud dependencies** — everything self-hosted (except Cloudflare tunnel for external access)
 
 ---

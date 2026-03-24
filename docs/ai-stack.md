@@ -1,28 +1,53 @@
 # AI / ML Stack
 
-Multiple dedicated LXC containers on a 128 GB RAM node for running local LLMs, ML research, and AI experiments.
+Multiple dedicated LXC containers on a 128 GB RAM node for running local LLMs, ML research, AI experiments, and AI-powered automation.
 
 ---
 
 ## Architecture
 
 ```
-AIServer (128 GB RAM, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
+AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │
-├── LXC 102 — "openclaw" (LLM Chat)
-│   ├── Ollama (model serving)
-│   ├── Open-WebUI (chat interface)
+├── LXC 102 — "openclaw" (28 GB — LLM Chat)
+│   ├── Ollama (model serving, 2min idle timeout)
+│   │   ├── qwen3.5:35b-a3b (23 GB, chat)
+│   │   ├── qwen3:1.7b (1.4 GB, Discord bot intent parsing)
+│   │   ├── nomic-embed-text (275 MB, document RAG embeddings)
+│   │   └── qwen3:4b, qwen3:0.6b (available, not active)
+│   ├── Open-WebUI (chat interface, port 8080)
 │   └── MCP tools proxy (Proxmox management from chat)
 │
-├── LXC 105 — "research-env" (ML Research)
+├── LXC 105 — "research-env" (16 GB — ML Research)
 │   ├── GPU passthrough (Radeon 8060S via ROCm)
-│   ├── PyTorch + ROCm
+│   ├── PyTorch 2.9.1 + ROCm 7.12 (native gfx1151)
 │   └── Full scientific Python stack
 │
-└── LXC 100 — "media-monitor" (Health Agent)
-    ├── Ollama (small model for reasoning)
-    └── Automated health check + remediation
+├── LXC 106 — "ai-detector" (12 GB — AI Detection)
+│   ├── GPU passthrough (shared iGPU)
+│   └── DeBERTa fine-tuning for AI text detection
+│
+├── LXC 100 — "media-monitor" (8 GB — Health Agent)
+│   ├── Ollama qwen2.5:7b (local reasoning)
+│   └── Automated health check + auto-fix + torrent recovery
+│
+├── Host services:
+│   ├── Homelab API (port 9105) — unified FastAPI aggregating all services
+│   ├── Document RAG (port 9103) — vector search over Paperless docs
+│   ├── Terraform status (port 9104) — IaC state API
+│   └── Temp API (port 9101) — hardware sensor data
+│
+└── Discord Bot AI (runs on LXC 200, calls Ollama on LXC 102)
+    └── *ai command — 30+ actions, sub-second intent parsing
 ```
+
+### GPU Note (AMD 8060S iGPU)
+- Only **2 GB VRAM** — models don't fit, weights stay in system RAM
+- GPU used for compute (matrix ops), not weight storage
+- System RAM used for weights **counts against LXC memory limit**
+- VRAM is separate and **bypasses** container limits
+- Shared across LXCs 102, 105, 106 via /dev/dri + /dev/kfd
+- Not exclusive like RTX 2070 on pve (fully owned by VM 103)
 
 ---
 
