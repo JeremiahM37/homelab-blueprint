@@ -1,6 +1,6 @@
 # AI / ML Stack
 
-Multiple dedicated LXC containers on a 128 GB RAM node for running local LLMs, ML research, AI experiments, and AI-powered automation.
+Multiple dedicated LXC containers on a 128 GB RAM node for running local LLMs, ML research, AI experiments, and AI-powered automation. The centerpiece is a **tool-calling AI agent** that controls the entire homelab via natural language.
 
 ---
 
@@ -11,11 +11,13 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │
 ├── LXC 102 — "openclaw" (28 GB — LLM Chat)
 │   ├── Ollama (model serving, 2min idle timeout)
-│   │   ├── qwen3.5:35b-a3b (23 GB, chat)
+│   │   ├── qwen3.5:35b-a3b (23 GB, chat + tool calling)
 │   │   ├── qwen3:1.7b (1.4 GB, Discord bot intent parsing)
 │   │   ├── nomic-embed-text (275 MB, document RAG embeddings)
 │   │   └── qwen3:4b, qwen3:0.6b (available, not active)
 │   ├── Open-WebUI (chat interface, port 8080)
+│   │   └── SearXNG integration (AI web search)
+│   │   └── MCP tools (Proxmox + Homelab management)
 │   └── MCP tools proxy (Proxmox management from chat)
 │
 ├── LXC 105 — "research-env" (16 GB — ML Research)
@@ -32,13 +34,24 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │   └── Automated health check + auto-fix + torrent recovery
 │
 ├── Host services:
-│   ├── Homelab API (port 9105) — unified FastAPI aggregating all services
+│   ├── Homelab API (port 9105) — unified FastAPI with AI agent
+│   │   ├── /api/ai/jarvis — tool-calling agent endpoint
+│   │   ├── /api/guardian/* — Download Guardian
+│   │   ├── /api/verify/* — library verification
+│   │   ├── /api/diag/* — diagnostic tools
+│   │   ├── /api/gaming/* — game search + download
+│   │   └── /api/system/storage — per-node disk usage
 │   ├── Document RAG (port 9103) — vector search over Paperless docs
 │   ├── Terraform status (port 9104) — IaC state API
 │   └── Temp API (port 9101) — hardware sensor data
 │
+├── SearXNG (runs on LXC 200, port 8888)
+│   ├── Connected to Open WebUI for AI web search
+│   ├── Connected to Homepage search widget
+│   └── JSON API at /search?q=...&format=json
+│
 └── Discord Bot AI (runs on LXC 200, calls Ollama on LXC 102)
-    └── *ai command — 30+ actions, sub-second intent parsing
+    └── *ai command — 40+ tools via agent loop
 ```
 
 ### GPU Note (AMD 8060S iGPU)
@@ -51,12 +64,213 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 
 ---
 
+## AI Tool-Calling Agent
+
+The `/api/ai/jarvis` endpoint is a full tool-calling agent — not just a chat wrapper. It uses Ollama's native tool calling with qwen3.5:35b-a3b to decide which actions to take, execute them, and synthesize results.
+
+### Agent Loop
+
+```
+User message (any interface)
+  └── Homelab API /api/ai/jarvis
+        └── Build tool definitions (40+ tools)
+              └── Send to Ollama with tool_call capability
+                    └── LLM returns tool_call decisions
+                          └── Execute tool calls against homelab APIs
+                                └── Feed results back to LLM
+                                      └── LLM generates final response
+                                            (or makes more tool calls)
+```
+
+### Interfaces
+
+The same agent brain powers three interfaces:
+
+| Interface | Access | Notes |
+|-----------|--------|-------|
+| **Discord bot** | `*ai <anything>` in Discord | Sub-second intent parsing via qwen3:1.7b, then routes to agent |
+| **Homepage chat widget** | Floating bubble on dashboard | Custom JS/CSS with tool-call progress indicators |
+| **Open WebUI** | MCP tools via mcpo proxy | Full chat UI with conversation history |
+
+### Tool Categories (40+)
+
+| Category | Tools | Examples |
+|----------|-------|---------|
+| **Web search** | SearXNG integration | Search the web, summarize results |
+| **Media control** | Jellyfin, Sonarr, Radarr, Jellyseerr | Now playing, calendar, request movies/TV |
+| **Downloads** | qBittorrent, gluetun | Speed, list torrents, pause/resume all |
+| **Books** | Audiobookshelf, Calibre, Kavita, Librarr | Search, request, recent additions |
+| **Documents** | Paperless | Search, tag, set correspondents, RAG queries |
+| **Photos** | Immich | Search, list albums, upload |
+| **Recipes** | Mealie | Search, import from URL, random, meal plan |
+| **Inventory** | Homebox | Search items, list locations |
+| **Gaming** | Gamarr, Bazzite | Search games, download ROMs, VM status, sync status |
+| **Monitoring** | Uptime Kuma, Changedetection | Website changes, uptime status |
+| **Diagnostics** | File ops, logs, rescans | Check files, fix permissions, read container logs |
+| **Verification** | Library checks | Verify items exist with real API proof |
+| **System** | Temps, storage, backups | Per-node disk usage, trigger backups, sensor data |
+| **Transcoding** | Tdarr | Stats, queue status |
+
+---
+
+## Download Guardian
+
+A persistent download monitoring service backed by SQLite (`guardian.db`). It tracks download jobs across API restarts and tries multiple sources in priority order.
+
+### Source Priority
+
+| Media Type | Source Order |
+|------------|-------------|
+| **Books** | Anna's Archive -> Prowlarr -> Gutenberg |
+| **Movies/TV** | Jellyseerr (routes to Sonarr/Radarr) |
+| **Games** | Gamarr torrent -> Myrient (direct download) |
+
+### Job Lifecycle
+
+```
+Request received
+  └── Create job in SQLite (survives restarts)
+        └── Try source #1
+              ├── Success → start library verification loop
+              │               └── Poll every 60s for up to 30 minutes
+              │                     └── Verify item appears in target library
+              └── Failure → try source #2
+                    └── ... continue through priority list
+                          └── All sources exhausted → mark failed
+                                └── AI agent can use diagnostic tools to investigate
+```
+
+### API Endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/guardian/request` | Submit a new download request |
+| `GET /api/guardian/status` | List all active/recent jobs |
+| `GET /api/guardian/job/{id}` | Detailed status of a specific job |
+
+---
+
+## Library Verification
+
+The `/api/verify/check` endpoint performs **definitive** verification — real API calls with proof, not fuzzy title matching.
+
+### Per-Library Checks
+
+| Library | What It Checks |
+|---------|---------------|
+| **Jellyfin** | Items API for file path + media sources + runtime |
+| **Audiobookshelf** | `isMissing=false` + `numAudioFiles > 0` + duration |
+| **Kavita** | Series pages > 0 + folder path |
+| **Gamarr** | Download status + file existence |
+
+### Endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/verify/check?title=...&library=jellyfin` | Check a specific library |
+| `GET /api/verify/check-all?title=...` | Check ALL libraries at once |
+
+---
+
+## Diagnostic Tools
+
+Available at `/api/diag/*` for AI escalation when automated processes fail. These execute on LXC 200 via SSH.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/diag/check_file_exists` | Verify a file/directory exists |
+| `POST /api/diag/list_directory` | List contents of a directory |
+| `POST /api/diag/extract_archive_recursive` | Extract nested archives |
+| `POST /api/diag/move_file` | Move/rename files |
+| `POST /api/diag/fix_permissions` | Fix ownership (chown 1000:1000) |
+| `POST /api/diag/read_container_logs` | Read Docker container logs |
+| `POST /api/diag/rescan_library` | Trigger library rescan (Jellyfin/ABS/Kavita) |
+
+### Escalation Flow
+
+```
+Download Guardian fails
+  └── AI agent detects failure
+        └── Uses diagnostic tools to investigate
+              ├── Check if file exists on disk
+              ├── Read container logs for errors
+              ├── Fix permissions if needed
+              ├── Trigger library rescan
+              └── Report findings to user
+```
+
+---
+
+## SearXNG (Self-Hosted Web Search)
+
+A self-hosted metasearch engine running on LXC 200, port 8888. Aggregates results from multiple search engines without tracking.
+
+### Integrations
+
+| Consumer | How |
+|----------|-----|
+| **AI Agent** | Web search tool calls via JSON API |
+| **Open WebUI** | Configured as search provider for AI-assisted browsing |
+| **Homepage** | Search widget (replaces Google) |
+
+### API
+
+```bash
+# JSON search
+curl "http://YOUR_DOCKER_HOST_IP:8888/search?q=proxmox+gpu+passthrough&format=json"
+```
+
+---
+
+## Paperless Tagging
+
+The AI agent can manage Paperless documents via natural language:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/documents/tags` | List all tags |
+| `POST /api/documents/tags` | Create a new tag |
+| `POST /api/documents/tag` | Tag a document by name |
+| `POST /api/documents/correspondent` | Set document correspondent |
+| `GET /api/documents/search?q=...` | Search documents |
+
+Example: "Tag all my tax documents from 2025 with 'taxes'" — the agent searches Paperless, finds matching documents, and applies the tag.
+
+---
+
+## Gaming API
+
+Endpoints at `/api/gaming/*` for game management:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/gaming/search?q=...` | Search games via Gamarr |
+| `POST /api/gaming/download` | Download ROMs or PC games |
+| `GET /api/gaming/sync-status` | Check game-sync.sh status on Bazzite |
+| `GET /api/gaming/bazzite-status` | Bazzite VM status (SSH, Sunshine/Moonlight) |
+| `GET /api/gaming/stats` | Game collection stats by platform |
+
+---
+
+## Storage API
+
+Per-node disk usage monitoring:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/system/storage` | All nodes' disk usage |
+| `GET /api/system/storage/{node}` | Specific node (used/free/total/percent) |
+| `POST /api/system/backup/{target}` | Trigger backup for a specific target |
+
+---
+
 ## Local LLM Chat (LXC 102)
 
 ### Ollama
 
 - Serves large language models locally
 - Current model: `qwen3.5:35b-a3b` (23 GB, Q4_K_M quantization)
+- **Native tool calling** support — used by the AI agent
 - API endpoint: `http://<lxc-ip>:11434`
 - Runs as a systemd service (auto-start on boot)
 
@@ -65,14 +279,16 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 - ChatGPT-like web interface for Ollama
 - Port 8080 (pip-installed, not Docker)
 - Data stored at `/var/lib/open-webui/`
+- **SearXNG integration** for AI-assisted web search
+- **MCP tools** for Proxmox and homelab management
 - Runs as a systemd service
 
 ### MCP Tools Proxy
 
-Bridges Proxmox management tools into the chat interface:
+Bridges Proxmox and homelab management tools into the chat interface:
 
 ```
-Open-WebUI → mcpo proxy (port 8100 on AIServer host) → MCP Proxmox server → pvesh
+Open-WebUI → mcpo proxy (port 8100 on AIServer host) → MCP servers → pvesh / homelab API
 ```
 
 This lets you manage VMs/containers from the chat UI ("start VM 103", "show cluster status").
@@ -143,4 +359,4 @@ systemd timer (5min)
 - Only sends failing checks to the LLM (not all 59 probes)
 - `num_ctx=8192` for sufficient context
 - Fallback summary mode if LLM is unavailable
-- Rule-based fixes for known issues (e.g., dead network namespace → restart gluetun)
+- Rule-based fixes for known issues (e.g., dead network namespace -> restart gluetun)

@@ -58,11 +58,17 @@ All services run on a single privileged LXC container (12 cores, 24 GB RAM) usin
 | **stirling-pdf** | 8084 | PDF tools | |
 | **it-tools** | 8085 | Developer utilities | |
 
+### Search
+
+| Container | Port | Purpose | Notes |
+|-----------|------|---------|-------|
+| **searxng** | 8888 | Self-hosted web search | JSON API, powers AI agent + Homepage search |
+
 ### Infrastructure & Monitoring
 
 | Container | Port | Purpose | Notes |
 |-----------|------|---------|-------|
-| **homepage** | 3000 | Dashboard | Aggregates all service status |
+| **homepage** | 3000 | Dashboard | AI chat widget, SearXNG search, disk usage widgets |
 | **uptime-kuma** | 3001 | Uptime monitoring | HTTP/TCP/ping checks |
 | **n8n** | 5678 | Workflow automation | Watchdog workflows, health checks |
 | **portainer** | 9000 | Docker management UI | |

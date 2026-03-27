@@ -485,6 +485,23 @@ services:
     restart: unless-stopped
 
   # ============================================================
+  # Search
+  # ============================================================
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    volumes:
+      - ./searxng:/etc/searxng
+    ports:
+      - "8888:8080"
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8888/
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  # ============================================================
   # Infrastructure & Monitoring
   # ============================================================
 

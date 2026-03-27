@@ -9,35 +9,51 @@ This repo documents the architecture, services, and lessons learned. No credenti
 ## Cluster Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                     Proxmox VE Cluster ("HomeServer")               │
-│                        3 nodes · PVE 9.1.1                          │
-├──────────────────┬──────────────────────┬───────────────────────────┤
-│    Node: pve     │  Node: MediaServer   │     Node: AIServer        │
-│  (Gaming/Dev)    │  (Media Stack Host)  │   (AI/ML Workloads)       │
-│                  │                      │                           │
-│  CPU: i7-9700K   │  CPU: Ryzen 7 8845HS │  CPU: Ryzen AI MAX+ 395  │
-│  RAM: 32 GB      │  RAM: 28 GB          │  RAM: 128 GB             │
-│  GPU: RTX 2070*  │  iGPU: Radeon 780M   │  iGPU: Radeon 8060S      │
-│                  │                      │                           │
-│  ┌────────────┐  │  ┌────────────────┐  │  ┌───────────────────┐   │
-│  │ VM 103     │  │  │ LXC 200        │  │  │ LXC 100           │   │
-│  │ Bazzite    │  │  │ Docker Host    │  │  │ Media Monitor     │   │
-│  │ Gaming VM  │  │  │ 35+ containers │  │  │ (health agent)    │   │
-│  │ 4c/24GB    │  │  │ 12c/24GB       │  │  ├───────────────────┤   │
-│  │ GPU pass-  │  │  └────────────────┘  │  │ LXC 101           │   │
-│  │ through    │  │                      │  │ Dev Workspace     │   │
-│  └────────────┘  │                      │  ├───────────────────┤   │
-│                  │                      │  │ LXC 102  Ollama   │   │
-│  * Only GPU in   │  DAS: 8TB btrfs      │  │ LXC 104  Work     │   │
-│    system —      │  (USB TerraMaster)   │  │ LXC 105  Research │   │
-│    host goes     │                      │  │ LXC 106  AI Det.  │   │
-│    headless      │                      │  ├───────────────────┤   │
-│    when VM runs  │                      │  │ Homelab API :9105 │   │
-│                  │                      │  │ Doc RAG     :9103 │   │
-│                  │                      │  │ Terraform   :9104 │   │
-│                  │                      │  └───────────────────┘   │
-└──────────────────┴──────────────────────┴───────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     Proxmox VE Cluster ("HomeServer")                       │
+│                        3 nodes · PVE 9.1.1                                  │
+├──────────────────┬──────────────────────┬───────────────────────────────────┤
+│    Node: pve     │  Node: MediaServer   │     Node: AIServer                │
+│  (Gaming/Dev)    │  (Media Stack Host)  │   (AI/ML Workloads)               │
+│                  │                      │                                   │
+│  CPU: i7-9700K   │  CPU: Ryzen 7 8845HS │  CPU: Ryzen AI MAX+ 395          │
+│  RAM: 32 GB      │  RAM: 28 GB          │  RAM: 128 GB                     │
+│  GPU: RTX 2070*  │  iGPU: Radeon 780M   │  iGPU: Radeon 8060S              │
+│                  │                      │                                   │
+│  ┌────────────┐  │  ┌────────────────┐  │  ┌───────────────────────────┐   │
+│  │ VM 103     │  │  │ LXC 200        │  │  │ LXC 100  Media Monitor   │   │
+│  │ Bazzite    │  │  │ Docker Host    │  │  │ LXC 101  Dev Workspace   │   │
+│  │ Gaming VM  │  │  │ 35+ containers │  │  │ LXC 102  Ollama + WebUI  │   │
+│  │ 4c/24GB    │  │  │ 12c/24GB       │  │  │ LXC 104  Work Env        │   │
+│  │ GPU pass-  │  │  │                │  │  │ LXC 105  ML Research     │   │
+│  │ through    │  │  │ + SearXNG      │  │  │ LXC 106  AI Detection    │   │
+│  └────────────┘  │  └────────────────┘  │  ├───────────────────────────┤   │
+│                  │                      │  │ Homelab API   :9105       │   │
+│  * Only GPU in   │  DAS: 8TB btrfs      │  │  └─ AI Agent (Jarvis)    │   │
+│    system —      │  (USB TerraMaster)   │  │  └─ Download Guardian    │   │
+│    host goes     │                      │  │  └─ Library Verification │   │
+│    headless      │                      │  │  └─ Diagnostic Tools     │   │
+│    when VM runs  │                      │  │ Doc RAG         :9103    │   │
+│                  │                      │  │ Terraform       :9104    │   │
+│                  │                      │  └───────────────────────────┘   │
+├──────────────────┴──────────────────────┴───────────────────────────────────┤
+│                                                                             │
+│   ┌── AI Agent Brain ──────────────────────────────────────────────────┐    │
+│   │  qwen3.5:35b-a3b on Ollama (native tool calling, 40+ tools)      │    │
+│   │                                                                    │    │
+│   │  Interfaces:                                                       │    │
+│   │    Discord bot (*ai) ──┐                                           │    │
+│   │    Homepage chat ──────┼── /api/ai/jarvis ── tool loop ── execute  │    │
+│   │    Open WebUI (MCP) ──┘                                           │    │
+│   │                                                                    │    │
+│   │  Subsystems:                                                       │    │
+│   │    Download Guardian (persistent job tracking, multi-source)       │    │
+│   │    Library Verification (real API proof, not fuzzy matching)       │    │
+│   │    Diagnostics (file ops, log reading, library rescans)           │    │
+│   │    SearXNG (self-hosted web search) ─── Open WebUI + Homepage     │    │
+│   └────────────────────────────────────────────────────────────────────┘    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Hardware
@@ -75,19 +91,61 @@ Internet
         │
         ├── MediaServer node
         │     └── LXC 200 — bridged LAN
-        │           └── gluetun VPN (Mullvad WireGuard)
-        │                 ├── qBittorrent
-        │                 ├── Librarr
-        │                 └── Gamarr
+        │           ├── gluetun VPN (Mullvad WireGuard)
+        │           │     ├── qBittorrent
+        │           │     ├── Librarr
+        │           │     └── Gamarr
+        │           └── SearXNG (self-hosted web search)
         │
         └── AIServer node
-              ├── LXC 100-105 — bridged LAN
+              ├── LXC 100-106 — bridged LAN
+              ├── Homelab API + AI Agent (port 9105)
               └── MCP server (Proxmox management)
 ```
 
 ### VPN Architecture
 
 Download clients (qBittorrent, Librarr, Gamarr) route through a **gluetun** container running Mullvad WireGuard. Services that need VPN protection use `network_mode: "service:gluetun"` in Docker Compose and expose their ports through gluetun.
+
+---
+
+## AI Assistant
+
+The homelab is controlled by a **tool-calling AI agent** powered by a local 35B-parameter LLM (qwen3.5:35b-a3b) running on Ollama with native tool calling. The agent has **40+ tools** for managing every aspect of the homelab.
+
+### How It Works
+
+```
+User (Discord / Homepage / Open WebUI)
+  └── /api/ai/jarvis
+        └── LLM decides which tools to call
+              └── Executes against homelab APIs
+                    └── Feeds results back to LLM
+                          └── Generates natural language response
+```
+
+### Interfaces
+
+All three interfaces share the same agent brain:
+
+| Interface | How | Use Case |
+|-----------|-----|----------|
+| **Discord bot** | `*ai <anything>` command | Mobile / quick commands |
+| **Homepage widget** | Floating chat bubble (custom.js) | Dashboard integration |
+| **Open WebUI** | MCP tools proxy | Full chat UI with history |
+
+### Key Subsystems
+
+| System | Purpose |
+|--------|---------|
+| **Download Guardian** | Persistent job tracking with SQLite, multi-source fallback, library verification loop |
+| **Library Verification** | Real API calls with proof (file paths, durations, page counts) — not fuzzy title matching |
+| **Diagnostic Tools** | File ops, log reading, permission fixes, library rescans — for AI escalation |
+| **SearXNG** | Self-hosted web search for AI and dashboard |
+| **Paperless Tagging** | AI-driven document tagging and correspondent assignment |
+| **Gaming API** | Game search, ROM download, sync status, Bazzite VM control |
+
+See [AI Stack](docs/ai-stack.md) for full details.
 
 ---
 
@@ -113,9 +171,9 @@ Download clients (qBittorrent, Librarr, Gamarr) route through a **gluetun** cont
 | [Docker Services](docs/docker-services.md) | All 55+ containers running on LXC 200 |
 | [Gaming VM](docs/gaming-vm.md) | Bazzite setup, GPU passthrough, Sunshine/Moonlight streaming |
 | [Game Pipeline](docs/game-pipeline.md) | Automated game download → install → Steam library pipeline |
-| [AI Stack](docs/ai-stack.md) | Ollama, Open-WebUI, Discord AI bot, RAG, unified API |
-| [Automation](docs/automation.md) | Discord AI bot, media-monitor, backups, CrowdSec, Terraform |
-| [Monitoring](docs/monitoring.md) | n8n watchdog workflows, media-monitor agent, Homepage dashboard |
+| [AI Stack](docs/ai-stack.md) | Tool-calling agent, Download Guardian, verification, diagnostics, RAG, SearXNG |
+| [Automation](docs/automation.md) | Download Guardian, backups, CrowdSec, Terraform, dual-channel alerts |
+| [Monitoring](docs/monitoring.md) | n8n watchdog workflows, media-monitor agent, Homepage dashboard, storage monitoring |
 | [Media Stack](docs/media-stack.md) | Jellyfin, *arr apps, download automation |
 | [Networking](docs/networking.md) | VPN, Cloudflare tunnel, Tailscale mesh |
 | [Lessons Learned](docs/lessons-learned.md) | Gotchas, debugging tips, things that broke |
@@ -130,13 +188,19 @@ Download clients (qBittorrent, Librarr, Gamarr) route through a **gluetun** cont
 - **~188 GB total RAM** across the cluster
 - **8 TB DAS** for media storage
 - **GPU passthrough** on 2 nodes (NVIDIA for gaming, AMD iGPU shared across 3 LXCs for ML)
-- **Discord AI bot** — natural language control of 30+ actions across 15 services (local LLM, zero cloud cost)
+- **AI tool-calling agent** — 40+ tools, local 35B LLM, controls the entire homelab via natural language
+- **3 agent interfaces** — Discord bot, Homepage chat widget, Open WebUI (same brain, same tools)
+- **Download Guardian** — persistent job tracking, multi-source fallback, automatic library verification
+- **Library verification** — real API proof (file paths, durations, page counts), not fuzzy matching
+- **Diagnostic toolkit** — file ops, log reading, permission fixes, library rescans for AI escalation
+- **SearXNG** — self-hosted web search for AI agent and Homepage dashboard
 - **Unified API** — single FastAPI endpoint aggregating all services (Swagger docs included)
 - **Document RAG** — vector search over 169+ documents via local embeddings + LLM
 - **Automated backups** — Restic to DAS, 3 nodes, daily, encrypted, deduplicated
 - **CrowdSec IPS** — 1400+ malicious IPs blocked at firewall, community threat intel
 - **Terraform IaC** — entire cluster defined as code, importable state
 - **AI self-healing** — media-monitor agent auto-fixes containers, torrents, VPN, permissions
+- **Dual-channel Discord alerts** — all watchdogs and bots report to both Discord servers
 - **Zero cloud dependencies** — everything self-hosted (except Cloudflare tunnel for external access)
 
 ---
