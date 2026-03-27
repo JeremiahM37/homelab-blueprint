@@ -51,7 +51,7 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │   └── JSON API at /search?q=...&format=json
 │
 └── Discord Bot AI (runs on LXC 200, calls Ollama on LXC 102)
-    └── *ai command — 40+ tools via agent loop
+    └── *ai command — 48 tools via agent loop
 ```
 
 ### GPU Note (AMD 8060S iGPU)
@@ -73,7 +73,7 @@ The `/api/ai/jarvis` endpoint is a full tool-calling agent — not just a chat w
 ```
 User message (any interface)
   └── Homelab API /api/ai/jarvis
-        └── Build tool definitions (40+ tools)
+        └── Build tool definitions (48 tools)
               └── Send to Ollama with tool_call capability
                     └── LLM returns tool_call decisions
                           └── Execute tool calls against homelab APIs
@@ -92,14 +92,15 @@ The same agent brain powers three interfaces:
 | **Homepage chat widget** | Floating bubble on dashboard | Custom JS/CSS with tool-call progress indicators |
 | **Open WebUI** | MCP tools via mcpo proxy | Full chat UI with conversation history |
 
-### Tool Categories (40+)
+### Tool Categories (48)
 
 | Category | Tools | Examples |
 |----------|-------|---------|
 | **Web search** | SearXNG integration | Search the web, summarize results |
 | **Media control** | Jellyfin, Sonarr, Radarr, Jellyseerr | Now playing, calendar, request movies/TV |
 | **Downloads** | qBittorrent, gluetun | Speed, list torrents, pause/resume all |
-| **Books** | Audiobookshelf, Calibre, Kavita, Librarr | Search, request, recent additions |
+| **Books** | Librarr (Go), Audiobookshelf, Calibre, Kavita | Search 13 sources, download, request, recent additions |
+| **Guardian** | Sentinel (Go) | Create guardian jobs, check status, verify library arrival |
 | **Documents** | Paperless | Search, tag, set correspondents, RAG queries |
 | **Photos** | Immich | Search, list albums, upload |
 | **Recipes** | Mealie | Search, import from URL, random, meal plan |
@@ -107,21 +108,23 @@ The same agent brain powers three interfaces:
 | **Gaming** | Gamarr, Bazzite | Search games, download ROMs, VM status, sync status |
 | **Monitoring** | Uptime Kuma, Changedetection | Website changes, uptime status |
 | **Diagnostics** | File ops, logs, rescans | Check files, fix permissions, read container logs |
-| **Verification** | Library checks | Verify items exist with real API proof |
+| **Verification** | Sentinel library checks | Verify items exist with real API proof (file paths, durations, page counts) |
 | **System** | Temps, storage, backups | Per-node disk usage, trigger backups, sensor data |
 | **Transcoding** | Tdarr | Stats, queue status |
 
 ---
 
-## Download Guardian
+## Sentinel (Download Guardian)
 
-A persistent download monitoring service backed by SQLite (`guardian.db`). It tracks download jobs across API restarts and tries multiple sources in priority order.
+**Sentinel** is a standalone Go binary (11 MB) that acts as the download guardian and library verifier for the entire media pipeline. It replaced the previous Python-based guardian built into the homelab API.
+
+Sentinel monitors the full pipeline from content request to library arrival. When you request a movie, book, or audiobook, Sentinel watches the download, verifies it actually landed in your library with **definitive proof** (file paths, runtimes, page counts), and tries alternative sources if one fails.
 
 ### Source Priority
 
 | Media Type | Source Order |
 |------------|-------------|
-| **Books** | Anna's Archive -> Prowlarr -> Gutenberg |
+| **Books** | Librarr (13 sources) -> Prowlarr |
 | **Movies/TV** | Jellyseerr (routes to Sonarr/Radarr) |
 | **Games** | Gamarr torrent -> Myrient (direct download) |
 
@@ -129,46 +132,52 @@ A persistent download monitoring service backed by SQLite (`guardian.db`). It tr
 
 ```
 Request received
-  └── Create job in SQLite (survives restarts)
-        └── Try source #1
-              ├── Success → start library verification loop
-              │               └── Poll every 60s for up to 30 minutes
-              │                     └── Verify item appears in target library
-              └── Failure → try source #2
-                    └── ... continue through priority list
-                          └── All sources exhausted → mark failed
-                                └── AI agent can use diagnostic tools to investigate
+  └── Create guardian job in SQLite (survives restarts)
+        └── PENDING → SEARCHING → try sources in priority order
+              ├── DOWNLOADING → monitor qBittorrent progress
+              │     └── VERIFYING → check library for proof of arrival
+              │           └── COMPLETED (with proof: file path, runtime, page count)
+              └── Source failed → try next source
+                    └── All sources exhausted → FAILED + Discord notification
+                          └── AI agent can use diagnostic tools to investigate
 ```
 
-### API Endpoints
+### API Endpoints (port 9200)
 
 | Endpoint | Purpose |
 |----------|---------|
-| `POST /api/guardian/request` | Submit a new download request |
-| `GET /api/guardian/status` | List all active/recent jobs |
-| `GET /api/guardian/job/{id}` | Detailed status of a specific job |
+| `POST /api/jobs` | Create a new guardian job |
+| `GET /api/jobs` | List all jobs |
+| `GET /api/jobs/{id}` | Detailed status of a specific job |
+| `POST /api/jobs/{id}/cancel` | Cancel a job |
+| `POST /api/jobs/{id}/retry` | Retry a failed job |
+| `GET /api/stats` | Job statistics |
+| `POST /api/verify` | One-shot library verification (no job) |
+| `GET /health` | Health check |
 
 ---
 
-## Library Verification
+## Library Verification (Sentinel)
 
-The `/api/verify/check` endpoint performs **definitive** verification — real API calls with proof, not fuzzy title matching.
+Sentinel's verification system performs **definitive** checks — real API calls with proof, not fuzzy title matching. This is used both by guardian jobs (automatic) and one-shot verification requests.
 
 ### Per-Library Checks
 
-| Library | What It Checks |
-|---------|---------------|
-| **Jellyfin** | Items API for file path + media sources + runtime |
-| **Audiobookshelf** | `isMissing=false` + `numAudioFiles > 0` + duration |
-| **Kavita** | Series pages > 0 + folder path |
-| **Gamarr** | Download status + file existence |
+| Library | What It Checks | Proof |
+|---------|---------------|-------|
+| **Jellyfin** | Items API | File path + runtime |
+| **Audiobookshelf** | Library items | `isMissing=false` + audio file count + duration |
+| **Kavita** | Series search | Page count > 0 + folder path |
+| **Sonarr** | Series lookup | Episode file count > 0 + series path |
+| **Radarr** | Movie lookup | `hasFile=true` + file path + size |
 
-### Endpoints
+### Endpoints (on Sentinel, port 9200)
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /api/verify/check?title=...&library=jellyfin` | Check a specific library |
-| `GET /api/verify/check-all?title=...` | Check ALL libraries at once |
+| `POST /api/verify` | One-shot verification with proof |
+
+The AI agent also exposes verification through the unified API at `/api/verify/check` and `/api/verify/check-all`.
 
 ---
 

@@ -6,7 +6,7 @@ Everything built to run autonomously with minimal human intervention.
 
 ## Discord AI Bot
 
-A custom Discord bot (`discord-bot` container, port 3003) with a local LLM-powered `*ai` command that routes natural language to 40+ tools across 15+ services.
+A custom Discord bot (`discord-bot` container, port 3003) with a local LLM-powered `*ai` command that routes natural language to 48 tools across 15+ services.
 
 ### Architecture
 
@@ -23,7 +23,7 @@ Discord message
 ### Performance
 - Intent parsing: **<1 second** (think mode disabled)
 - Tool-calling agent: 2-10 seconds depending on tool chain complexity
-- System prompt: ~1,141 tokens, 40+ tools
+- System prompt: ~1,141 tokens, 48 tools
 - Model: qwen3:1.7b (~1.4GB) for intent, qwen3.5:35b-a3b (23GB) for agent
 - Cost: **$0** (local inference)
 
@@ -31,7 +31,7 @@ Discord message
 
 | Category | Actions |
 |----------|---------|
-| Media requests | movie, tv, book, audiobook (via Jellyseerr/Librarr) |
+| Media requests | movie, tv, book, audiobook (via Jellyseerr/Librarr Go/Sentinel) |
 | PDF tools | compress, merge, convert to images, add page numbers, rotate (via Stirling PDF) |
 | Photos | upload to Immich, create albums, search, list albums |
 | Documents | upload to Paperless, search, tag, set correspondents |
@@ -61,32 +61,39 @@ Located in `/opt/docker/discord-bot/services/`:
 
 ---
 
-## Download Guardian
+## Sentinel (Download Guardian)
 
-A persistent download monitoring service that tracks jobs across API restarts using SQLite (`guardian.db`).
+**Sentinel** is a standalone Go binary (11 MB) that acts as the download guardian and library verifier. It replaced the previous Python-based guardian that was embedded in the homelab API.
+
+Sentinel monitors the full pipeline from content request to library arrival with definitive verification (file paths, runtimes, page counts -- not fuzzy title matching). It runs as its own Docker container on port 9200.
 
 ### How It Works
 
 1. **Request**: User asks for a book/movie/game via any interface
-2. **Job creation**: Guardian creates a SQLite-backed job record
-3. **Multi-source**: Tries sources in priority order per media type
-   - Books: Anna's Archive -> Prowlarr -> Gutenberg
+2. **Guardian job**: Sentinel creates a SQLite-backed job record
+3. **State machine**: Jobs advance through `PENDING -> SEARCHING -> DOWNLOADING -> VERIFYING -> COMPLETED`
+4. **Multi-source**: Tries sources in priority order per media type
+   - Books: Librarr (13 sources) -> Prowlarr
    - Movies/TV: Jellyseerr (routes to Sonarr/Radarr)
    - Games: Gamarr torrent -> Myrient direct download
-4. **Verification loop**: Polls target library every 60 seconds for up to 30 minutes
-5. **Escalation**: If all sources fail, AI agent can use diagnostic tools to investigate
+5. **Library verification**: Checks target library with real API calls and returns proof
+6. **Escalation**: If all sources fail, AI agent can use diagnostic tools to investigate
 
-### API
+### API (port 9200)
 
 | Endpoint | Purpose |
 |----------|---------|
-| `POST /api/guardian/request` | Submit a new download request |
-| `GET /api/guardian/status` | List all active/recent jobs |
-| `GET /api/guardian/job/{id}` | Detailed status of a specific job |
+| `POST /api/jobs` | Create a new guardian job |
+| `GET /api/jobs` | List all jobs |
+| `GET /api/jobs/{id}` | Detailed status of a specific job |
+| `POST /api/jobs/{id}/cancel` | Cancel a job |
+| `POST /api/jobs/{id}/retry` | Retry a failed job |
+| `GET /api/stats` | Job statistics |
+| `POST /api/verify` | One-shot library verification |
 
 ### Persistence
 
-Jobs survive API restarts because state is in SQLite, not in-memory. Previous architecture lost all in-progress downloads when the API restarted.
+Jobs survive restarts because state is in SQLite. The Go rewrite compiles to a single static binary (scratch Docker image) with zero runtime dependencies.
 
 ---
 

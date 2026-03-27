@@ -264,17 +264,60 @@ services:
       - internal
     restart: unless-stopped
 
-  # Librarr runs inside gluetun network (see gluetun ports)
+  # Librarr — Go binary, runs inside gluetun network (see gluetun ports)
+  # Rewritten from Python Flask. 17 MB binary, 13 search sources,
+  # Torznab/Newznab API, OPDS feed, embedded web UI.
   librarr:
     build: ./librarr
     container_name: librarr
     network_mode: "service:gluetun"
+    environment:
+      - PROWLARR_URL=http://prowlarr:9696
+      - PROWLARR_API_KEY=<YOUR_PROWLARR_API_KEY>
+      - QB_URL=http://localhost:8080
+      - QB_USER=<QBIT_USER>
+      - QB_PASS=<QBIT_PASSWORD>
+      - DB_PATH=/data/librarr.db
     volumes:
-      - ./librarr:/app
+      - ./librarr/data:/data
       - /data/media/books/ebooks/incoming:/books-incoming
       - /data/media/books/audiobooks:/audiobooks-incoming
     depends_on:
       - gluetun
+    restart: unless-stopped
+
+  # Sentinel — Go binary, download guardian + library verification
+  # Tracks jobs through the full pipeline, verifies library arrival with proof.
+  sentinel:
+    build: ./sentinel
+    container_name: sentinel
+    environment:
+      - JELLYSEERR_URL=http://jellyseerr:5055
+      - JELLYSEERR_API_KEY=<YOUR_JELLYSEERR_API_KEY>
+      - JELLYFIN_URL=http://jellyfin:8096
+      - JELLYFIN_API_KEY=<YOUR_JELLYFIN_API_KEY>
+      - PROWLARR_URL=http://prowlarr:9696
+      - PROWLARR_API_KEY=<YOUR_PROWLARR_API_KEY>
+      - QBITTORRENT_URL=http://gluetun:8080
+      - QBITTORRENT_USER=<QBIT_USER>
+      - QBITTORRENT_PASS=<QBIT_PASSWORD>
+      - AUDIOBOOKSHELF_URL=http://audiobookshelf:80
+      - AUDIOBOOKSHELF_TOKEN=<YOUR_ABS_TOKEN>
+      - KAVITA_URL=http://kavita:5000
+      - KAVITA_API_KEY=<YOUR_KAVITA_API_KEY>
+      - SONARR_URL=http://sonarr:8989
+      - SONARR_API_KEY=<YOUR_SONARR_API_KEY>
+      - RADARR_URL=http://radarr:7878
+      - RADARR_API_KEY=<YOUR_RADARR_API_KEY>
+      - SENTINEL_DB_PATH=/data/sentinel.db
+      - DISCORD_WEBHOOK_URL=<YOUR_DISCORD_WEBHOOK_URL>
+    volumes:
+      - ./sentinel/data:/data
+    ports:
+      - "9200:9200"
+    networks:
+      - proxy
+      - internal
     restart: unless-stopped
 
   # ============================================================

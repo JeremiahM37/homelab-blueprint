@@ -42,12 +42,20 @@ User Request                Search & Download              Organize & Serve
 ## Book Pipeline
 
 ```
-┌──────────┐    ┌───────────┐    ┌──────────┐
-│ Shelfarr │───▶│ Librarr   │───▶│ qBit /   │
-│(wishlist)│    │(search +  │    │ DDL      │
-└──────────┘    │ download) │    └────┬─────┘
-                └───────────┘         │
-                                      ▼
+┌──────────┐    ┌───────────────┐    ┌──────────┐
+│ Shelfarr │───▶│   Librarr     │───▶│ qBit /   │
+│(wishlist)│    │  (Go, 17 MB)  │    │ DDL      │
+└──────────┘    │ 13 sources    │    └────┬─────┘
+                │ Torznab/OPDS  │         │
+                └───────┬───────┘         │
+                        │                 │
+                ┌───────▼───────┐         │
+                │   Sentinel    │◀────────┘
+                │  (Go, 11 MB)  │
+                │ Guardian jobs │
+                │ Lib. verify   │
+                └───────┬───────┘
+                        ▼
                 ┌─────────────────────────────────┐
                 │         Organize & Serve         │
                 ├──────────┬───────────┬───────────┤
@@ -58,18 +66,33 @@ User Request                Search & Download              Organize & Serve
 ```
 
 - **Shelfarr** — Track wanted books, send to Librarr
-- **Librarr** — Custom Flask app that searches multiple sources (Anna's Archive, LibGen, Gutenberg, Open Library, Librivox)
+- **Librarr** — Go binary (17 MB, rewritten from Python Flask), searches 13 sources in parallel, exposes Torznab/Newznab API for integration with *arr apps, serves an OPDS feed for e-readers, and includes an embedded web UI
+- **Sentinel** — Go binary (11 MB), download guardian that tracks the full pipeline from request to library arrival with definitive verification
 - **Post-download**: Organize files → import to appropriate library → track in SQLite
 
-### Book Sources
+### Book Sources (Librarr — 13 sources)
 
 | Source | Content | Method |
 |--------|---------|--------|
 | Anna's Archive | Ebooks (epub, pdf) | Direct download via LibGen mirrors |
-| LibGen | Ebooks, papers | Direct download |
+| Anna's Archive (manga) | Manga volumes | Direct download |
+| Prowlarr | Ebooks, audiobooks via torrent indexers | Torrent via qBittorrent |
+| AudioBookBay | Audiobooks | Magnet link via qBittorrent |
 | Project Gutenberg | Public domain ebooks | Direct download |
+| Standard Ebooks | Curated public domain ebooks | Direct download |
 | Open Library | Ebook lending | API |
 | Librivox | Public domain audiobooks | Direct download |
+| MangaDex | Manga chapters | Direct download |
+| Nyaa | Manga, light novels (torrents) | Torrent via qBittorrent |
+| Web novels | 6+ web novel sites | lncrawl scraper |
+
+### Torznab/Newznab API
+
+Librarr exposes a Torznab/Newznab-compatible API that can be added as an indexer in Prowlarr or other *arr apps. This lets the *arr stack search Librarr's 13 sources as if they were a standard indexer.
+
+### OPDS Feed
+
+Librarr serves an OPDS catalog feed, allowing e-reader apps (like KOReader, Moon+ Reader) to browse and download books directly.
 
 ### Library Servers
 

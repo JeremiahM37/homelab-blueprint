@@ -39,7 +39,7 @@ This repo documents the architecture, services, and lessons learned. No credenti
 ├──────────────────┴──────────────────────┴───────────────────────────────────┤
 │                                                                             │
 │   ┌── AI Agent Brain ──────────────────────────────────────────────────┐    │
-│   │  qwen3.5:35b-a3b on Ollama (native tool calling, 40+ tools)      │    │
+│   │  qwen3.5:35b-a3b on Ollama (native tool calling, 48 tools)       │    │
 │   │                                                                    │    │
 │   │  Interfaces:                                                       │    │
 │   │    Discord bot (*ai) ──┐                                           │    │
@@ -47,8 +47,8 @@ This repo documents the architecture, services, and lessons learned. No credenti
 │   │    Open WebUI (MCP) ──┘                                           │    │
 │   │                                                                    │    │
 │   │  Subsystems:                                                       │    │
-│   │    Download Guardian (persistent job tracking, multi-source)       │    │
-│   │    Library Verification (real API proof, not fuzzy matching)       │    │
+│   │    Librarr (Go, 13 sources, Torznab/Newznab, OPDS, embedded UI)  │    │
+│   │    Sentinel (Go, download guardian, library verification)         │    │
 │   │    Diagnostics (file ops, log reading, library rescans)           │    │
 │   │    SearXNG (self-hosted web search) ─── Open WebUI + Homepage     │    │
 │   └────────────────────────────────────────────────────────────────────┘    │
@@ -111,7 +111,7 @@ Download clients (qBittorrent, Librarr, Gamarr) route through a **gluetun** cont
 
 ## AI Assistant
 
-The homelab is controlled by a **tool-calling AI agent** powered by a local 35B-parameter LLM (qwen3.5:35b-a3b) running on Ollama with native tool calling. The agent has **40+ tools** for managing every aspect of the homelab.
+The homelab is controlled by a **tool-calling AI agent** powered by a local 35B-parameter LLM (qwen3.5:35b-a3b) running on Ollama with native tool calling. The agent has **48 tools** for managing every aspect of the homelab, including Librarr search/download and Sentinel guardian/verification.
 
 ### How It Works
 
@@ -138,8 +138,8 @@ All three interfaces share the same agent brain:
 
 | System | Purpose |
 |--------|---------|
-| **Download Guardian** | Persistent job tracking with SQLite, multi-source fallback, library verification loop |
-| **Library Verification** | Real API calls with proof (file paths, durations, page counts) — not fuzzy title matching |
+| **Librarr** | Go binary (17 MB), 13 search sources, Torznab/Newznab API, OPDS feed, embedded web UI |
+| **Sentinel** | Go binary (11 MB), download guardian with persistent job tracking, definitive library verification |
 | **Diagnostic Tools** | File ops, log reading, permission fixes, library rescans — for AI escalation |
 | **SearXNG** | Self-hosted web search for AI and dashboard |
 | **Paperless Tagging** | AI-driven document tagging and correspondent assignment |
@@ -188,10 +188,10 @@ See [AI Stack](docs/ai-stack.md) for full details.
 - **~188 GB total RAM** across the cluster
 - **8 TB DAS** for media storage
 - **GPU passthrough** on 2 nodes (NVIDIA for gaming, AMD iGPU shared across 3 LXCs for ML)
-- **AI tool-calling agent** — 40+ tools, local 35B LLM, controls the entire homelab via natural language
+- **AI tool-calling agent** — 48 tools, local 35B LLM, controls the entire homelab via natural language
 - **3 agent interfaces** — Discord bot, Homepage chat widget, Open WebUI (same brain, same tools)
-- **Download Guardian** — persistent job tracking, multi-source fallback, automatic library verification
-- **Library verification** — real API proof (file paths, durations, page counts), not fuzzy matching
+- **Librarr (Go rewrite)** — 17 MB binary, 13 search sources, Torznab/Newznab API, OPDS feed, embedded web UI
+- **Sentinel (Go)** — download guardian with persistent job tracking, definitive library verification with proof
 - **Diagnostic toolkit** — file ops, log reading, permission fixes, library rescans for AI escalation
 - **SearXNG** — self-hosted web search for AI agent and Homepage dashboard
 - **Unified API** — single FastAPI endpoint aggregating all services (Swagger docs included)
