@@ -26,8 +26,8 @@ All services run on a single privileged LXC container (12 cores, 24 GB RAM) usin
 | **calibre-web** | 8083 | Ebook library (OPDS) | Backed by Calibre database |
 | **kavita** | 5005 | Comic / manga reader | Separate from ebook library |
 | **shelfarr** | 5056 | Book wishlist + tracker | Tracks wanted books, sends to Librarr |
-| **librarr** | 5050 | Book search + download | Go binary (17 MB), 13 search sources, Torznab/Newznab API, OPDS feed, embedded web UI (via VPN) |
-| **sentinel** | 9200 | Download guardian + library verification | Go binary (11 MB), persistent job tracking, multi-source fallback, definitive library verification |
+| **librarr** | 5050 | Book search + download | Go binary (17 MB), 13 search sources, Torznab/Newznab API, OPDS feed, Usenet/SABnzbd, modern Tailwind dark UI, series grouping, wishlist, rate limiting (via VPN) |
+| **sentinel** | 9200 | Download guardian + library verification | Go binary (11 MB), SQLite persistence, multi-source fallback, definitive library verification (Jellyfin/ABS/Kavita/Sonarr/Radarr), Discord notifications |
 | **lncrawl** | — | Web novel scraper | Batch job, no persistent port |
 
 ### Games

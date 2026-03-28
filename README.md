@@ -111,7 +111,7 @@ Download clients (qBittorrent, Librarr, Gamarr) route through a **gluetun** cont
 
 ## AI Assistant
 
-The homelab is controlled by a **tool-calling AI agent** powered by a local 35B-parameter LLM (qwen3.5:35b-a3b) running on Ollama with native tool calling. The agent has **48 tools** for managing every aspect of the homelab, including Librarr search/download and Sentinel guardian/verification.
+The homelab is controlled by a **tool-calling AI agent** powered by a local 35B-parameter LLM (qwen3.5:35b-a3b) running on Ollama with native tool calling. The agent has **48+ tools** (51 MCP tools) for managing every aspect of the homelab, including Librarr search/download, Sentinel guardian/verification, and diagnostics. A proactive **Homelab Agent** scans every 15 minutes with container doctor, source intelligence, import watchdog, and AI escalation modules.
 
 ### How It Works
 
@@ -188,18 +188,22 @@ See [AI Stack](docs/ai-stack.md) for full details.
 - **~188 GB total RAM** across the cluster
 - **8 TB DAS** for media storage
 - **GPU passthrough** on 2 nodes (NVIDIA for gaming, AMD iGPU shared across 3 LXCs for ML)
-- **AI tool-calling agent** — 48 tools, local 35B LLM, controls the entire homelab via natural language
+- **AI tool-calling agent** — 48+ tools, local 35B LLM (qwen3.5:35b-a3b), controls the entire homelab via natural language
+- **51 MCP tools** — exposed via mcpo proxy, includes Librarr search/download, guardian, verification, diagnostics
 - **3 agent interfaces** — Discord bot, Homepage chat widget, Open WebUI (same brain, same tools)
-- **Librarr (Go rewrite)** — 17 MB binary, 13 search sources, Torznab/Newznab API, OPDS feed, embedded web UI
-- **Sentinel (Go)** — download guardian with persistent job tracking, definitive library verification with proof
+- **Librarr (Go)** — 17 MB binary, 13 search sources, Torznab/Newznab API, OPDS feed, Usenet/SABnzbd, modern dark UI with Tailwind, series grouping, wishlist, rate limiting
+- **Sentinel (Go)** — 11 MB binary, download guardian with SQLite persistence, definitive library verification (Jellyfin/ABS/Kavita/Sonarr/Radarr)
+- **Homelab Agent** — proactive monitoring every 15min, container doctor (14 containers), source intelligence (13 sources), import watchdog, failure memory (SQLite), AI escalation
+- **45 nightly tests** — comprehensive end-to-end tests at 5 AM, covers all services, Discord results
+- **SearXNG** — self-hosted web search for AI agent, Homepage dashboard, Open WebUI
 - **Diagnostic toolkit** — file ops, log reading, permission fixes, library rescans for AI escalation
-- **SearXNG** — self-hosted web search for AI agent and Homepage dashboard
 - **Unified API** — single FastAPI endpoint aggregating all services (Swagger docs included)
 - **Document RAG** — vector search over 169+ documents via local embeddings + LLM
-- **Automated backups** — Restic to DAS, 3 nodes, daily, encrypted, deduplicated
+- **Automated backups** — Restic to DAS, 4 nodes, daily, encrypted, deduplicated
 - **CrowdSec IPS** — 1400+ malicious IPs blocked at firewall, community threat intel
 - **Terraform IaC** — entire cluster defined as code, importable state
-- **AI self-healing** — media-monitor agent auto-fixes containers, torrents, VPN, permissions
+- **9 n8n workflows** — dual-channel Discord alerts, watchdogs, health checks
+- **AI self-healing** — media-monitor agent (reactive) + homelab agent (proactive) auto-fix containers, torrents, VPN, permissions, imports
 - **Dual-channel Discord alerts** — all watchdogs and bots report to both Discord servers
 - **Zero cloud dependencies** — everything self-hosted (except Cloudflare tunnel for external access)
 

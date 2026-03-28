@@ -34,13 +34,18 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │   └── Automated health check + auto-fix + torrent recovery
 │
 ├── Host services:
-│   ├── Homelab API (port 9105) — unified FastAPI with AI agent
+│   ├── Homelab API (port 9105) — unified FastAPI with AI agent (48+ tools)
 │   │   ├── /api/ai/jarvis — tool-calling agent endpoint
-│   │   ├── /api/guardian/* — Download Guardian
-│   │   ├── /api/verify/* — library verification
+│   │   ├── /api/guardian/* — proxies to Go Sentinel
+│   │   ├── /api/verify/* — proxies to Go Sentinel library verification
 │   │   ├── /api/diag/* — diagnostic tools
 │   │   ├── /api/gaming/* — game search + download
 │   │   └── /api/system/storage — per-node disk usage
+│   ├── Homelab Agent (port 9106) — proactive autonomous monitoring
+│   │   ├── Container doctor (14 containers, auto-restart)
+│   │   ├── Source intelligence (13 Librarr sources, hourly)
+│   │   ├── Import watchdog (stuck downloads, failed imports)
+│   │   └── AI escalation (to /api/ai/jarvis for complex failures)
 │   ├── Document RAG (port 9103) — vector search over Paperless docs
 │   ├── Terraform status (port 9104) — IaC state API
 │   └── Temp API (port 9101) — hardware sensor data
@@ -92,7 +97,7 @@ The same agent brain powers three interfaces:
 | **Homepage chat widget** | Floating bubble on dashboard | Custom JS/CSS with tool-call progress indicators |
 | **Open WebUI** | MCP tools via mcpo proxy | Full chat UI with conversation history |
 
-### Tool Categories (48)
+### Tool Categories (48+)
 
 | Category | Tools | Examples |
 |----------|-------|---------|
@@ -369,3 +374,54 @@ systemd timer (5min)
 - `num_ctx=8192` for sufficient context
 - Fallback summary mode if LLM is unavailable
 - Rule-based fixes for known issues (e.g., dead network namespace -> restart gluetun)
+
+---
+
+## Homelab Agent (Proactive Autonomous Monitoring)
+
+A proactive monitoring agent running on AIServer (port 9106) that scans the entire homelab every 15 minutes, detecting and fixing issues before they become visible to the user.
+
+### Architecture
+
+```
+systemd service (continuous, 15min scan loop)
+  └── agent.py
+        ├── container_doctor — monitors 14 key containers, auto-restart, crash loop detection
+        ├── source_intelligence — checks 13 Librarr search sources hourly, tracks availability
+        ├── import_watchdog — stuck downloads, failed imports, auto-retry
+        └── ai_escalation — complex failures → /api/ai/jarvis for AI-driven diagnosis
+```
+
+### Modules
+
+| Module | Purpose | Frequency |
+|--------|---------|-----------|
+| **Container Doctor** | Monitors 14 key containers, auto-restarts crashed ones, crash loop guard | Every 15 min |
+| **Source Intelligence** | Checks all 13 Librarr sources, tracks availability, detects outages | Every 60 min |
+| **Import Watchdog** | Detects stuck downloads and failed imports, auto-retries | Every 15 min |
+| **AI Escalation** | Escalates complex/recurring failures to AI agent for diagnosis | On failure |
+
+### Failure Memory
+
+- SQLite database tracks all failures and remediation attempts
+- Prevents repeating the same fix for recurring issues
+- Learns patterns (e.g., "this container crashes every Tuesday at 3 AM")
+- Discord notifications for all actions taken
+
+### Key Design Decisions
+
+- **No LLM for routine tasks** — uses rule-based logic for known patterns, only escalates to AI for complex unknowns
+- **Separate from media-monitor** — media-monitor (LXC 100) handles reactive health checks; homelab-agent handles proactive monitoring and source intelligence
+- **Failure memory prevents loops** — if a fix was tried and failed, it won't be retried until cooldown expires
+
+---
+
+## Nightly Tests (45 tests, 5 AM daily)
+
+Comprehensive end-to-end test suite that validates every service in the homelab is functioning correctly.
+
+- **Timer**: `nightly-tests.timer` / `nightly-tests.service`
+- **Location**: `/home/admin/nightly-tests/run_all.sh`
+- **Coverage**: HTTP health checks, API endpoints, SSH connectivity, Docker containers, Proxmox cluster
+- **Notification**: Results posted to Discord with pass/fail summary
+- **Runtime**: ~48 seconds for all 45 tests

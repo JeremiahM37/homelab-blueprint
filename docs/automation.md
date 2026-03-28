@@ -245,6 +245,38 @@ Checks -> LLM analyzes results -> decides simple fix or human alert -> executes 
 
 ---
 
+## Homelab Agent (Proactive Autonomous Monitoring)
+
+A proactive monitoring agent on AIServer (port 9106) that scans the entire homelab every 15 minutes.
+
+### Modules
+
+| Module | Purpose | Frequency |
+|--------|---------|-----------|
+| **Container Doctor** | Monitors 14 key containers, auto-restarts, crash loop detection | Every 15 min |
+| **Source Intelligence** | Checks all 13 Librarr search sources, tracks availability | Every 60 min |
+| **Import Watchdog** | Detects stuck downloads and failed imports, auto-retries | Every 15 min |
+| **AI Escalation** | Escalates complex failures to `/api/ai/jarvis` for AI diagnosis | On failure |
+
+### Design
+
+- SQLite failure memory prevents repeating failed fixes
+- Separate from media-monitor (LXC 100) which handles reactive health checks
+- Discord notifications for all actions
+
+---
+
+## Nightly Tests (45 tests, 5 AM daily)
+
+Comprehensive end-to-end test suite validating every service.
+
+- **Timer**: `nightly-tests.timer` / `nightly-tests.service`
+- **Coverage**: HTTP health checks, API endpoint validation, SSH connectivity, Docker container status, Proxmox cluster health
+- **Runtime**: ~48 seconds for all 45 tests
+- **Notification**: Results posted to Discord with pass/fail summary
+
+---
+
 ## Temperature Monitoring
 
 Tiny Python HTTP APIs on each node (port 9101) serving hardware sensor data as JSON. Powers the Homepage dashboard "Server Temps" section.
