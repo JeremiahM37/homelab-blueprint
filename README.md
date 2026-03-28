@@ -21,12 +21,12 @@ This repo documents the architecture, services, and lessons learned. No credenti
 │  GPU: RTX 2070*  │  iGPU: Radeon 780M   │  iGPU: Radeon 8060S              │
 │                  │                      │                                   │
 │  ┌────────────┐  │  ┌────────────────┐  │  ┌───────────────────────────┐   │
-│  │ VM 103     │  │  │ LXC 200        │  │  │ LXC 100  Media Monitor   │   │
-│  │ Bazzite    │  │  │ Docker Host    │  │  │ LXC 101  Dev Workspace   │   │
-│  │ Gaming VM  │  │  │ 35+ containers │  │  │ LXC 102  Ollama + WebUI  │   │
-│  │ 4c/24GB    │  │  │ 12c/24GB       │  │  │ LXC 104  Work Env        │   │
-│  │ GPU pass-  │  │  │                │  │  │ LXC 105  ML Research     │   │
-│  │ through    │  │  │ + SearXNG      │  │  │ LXC 106  AI Detection    │   │
+│  │ VM 103     │  │  │ LXC 200        │  │  │ LXC 101  Dev Workspace   │   │
+│  │ Bazzite    │  │  │ Docker Host    │  │  │ LXC 102  Ollama + WebUI  │   │
+│  │ Gaming VM  │  │  │ 35+ containers │  │  │ LXC 104  Work Env        │   │
+│  │ 4c/24GB    │  │  │ 12c/24GB       │  │  │ LXC 105  ML Research     │   │
+│  │ GPU pass-  │  │  │                │  │  │ LXC 106  AI Detection    │   │
+│  │ through    │  │  │ + SearXNG      │  │  │                           │   │
 │  └────────────┘  │  └────────────────┘  │  ├───────────────────────────┤   │
 │                  │                      │  │ Homelab API   :9105       │   │
 │  * Only GPU in   │  DAS: 8TB btrfs      │  │  └─ AI Agent (Jarvis)    │   │
@@ -51,9 +51,9 @@ This repo documents the architecture, services, and lessons learned. No credenti
 │   │    Sentinel (Go, download guardian, library verification)         │    │
 │   │    Diagnostics (file ops, log reading, library rescans)           │    │
 │   │    SearXNG (self-hosted web search) ─── Open WebUI + Homepage     │    │
-│   │    Homelab Agent (proactive: container doctor, source intel,      │    │
-│   │      import watchdog, AI escalation — every 15min, port 9106)    │    │
-│   │    Nightly Tests (45 tests at 5 AM, Discord results)             │    │
+│   │    Homelab Agent (proactive: 7 modules, 3-tier AI repair,         │    │
+│   │      every 5min, port 9106)                                      │    │
+│   │    Nightly Tests (76 tests at 5 AM, Discord results)             │    │
 │   └────────────────────────────────────────────────────────────────────┘    │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -101,7 +101,7 @@ Internet
         │           └── SearXNG (self-hosted web search)
         │
         └── AIServer node
-              ├── LXC 100-106 — bridged LAN
+              ├── LXC 101-106 — bridged LAN
               ├── Homelab API + AI Agent (port 9105)
               └── MCP server (Proxmox management)
 ```
@@ -114,7 +114,7 @@ Download clients (qBittorrent, Librarr, Gamarr) route through a **gluetun** cont
 
 ## AI Assistant
 
-The homelab is controlled by a **tool-calling AI agent** powered by a local 35B-parameter LLM (qwen3.5:35b-a3b) running on Ollama with native tool calling. The agent has **64+ tools** (64+ tools) for managing every aspect of the homelab, including Librarr search/download, Sentinel guardian/verification, and diagnostics. A proactive **Homelab Agent** scans every 15 minutes with container doctor, source intelligence, import watchdog, and AI escalation modules.
+The homelab is controlled by a **tool-calling AI agent** powered by a local 35B-parameter LLM (qwen3.5:35b-a3b) running on Ollama with GPU-accelerated inference (~22 ms/token via GTT unified memory). The agent has **64+ tools** for managing every aspect of the homelab. A proactive **Homelab Agent** with 7 modules scans every 5 minutes and uses a **3-tier AI repair system** (qwen3:1.7b fast tools, qwen3.5:35b smart fixer, Claude Code backstop) to autonomously detect and fix issues.
 
 ### How It Works
 
@@ -143,12 +143,12 @@ All three interfaces share the same agent brain:
 |--------|---------|
 | **Librarr** | Go binary (17 MB), 13 search sources, Torznab/Newznab API, OPDS feed, Usenet/SABnzbd, modern Tailwind dark UI, series grouping, wishlist |
 | **Sentinel** | Go binary (11 MB), download guardian with SQLite persistence, definitive library verification |
-| **Homelab Agent** | Proactive monitoring (15min), container doctor, source intelligence, import watchdog, failure memory, AI escalation |
+| **Homelab Agent** | Proactive monitoring (5min), 7 modules (container doctor, source intelligence, import watchdog, torrent doctor, system monitor, notifications, AI escalation), 3-tier repair system, failure memory |
 | **Diagnostic Tools** | File ops, log reading, permission fixes, library rescans — for AI escalation |
 | **SearXNG** | Self-hosted web search for AI agent, Homepage, Open WebUI |
 | **Paperless Tagging** | AI-driven document tagging and correspondent assignment |
 | **Gaming API** | Game search, ROM download, sync status, Bazzite VM control |
-| **Nightly Tests** | 45 end-to-end tests at 5 AM, Discord results notification |
+| **Nightly Tests** | 76 end-to-end tests at 5 AM (~60s), Discord results notification |
 
 See [AI Stack](docs/ai-stack.md) for full details.
 
@@ -158,7 +158,6 @@ See [AI Stack](docs/ai-stack.md) for full details.
 
 | VMID | Name | Node | Type | Resources | Purpose |
 |------|------|------|------|-----------|---------|
-| 100 | media-monitor | AIServer | LXC | 4c / 8 GB | AI self-healing health agent |
 | 101 | project-env | AIServer | LXC | 4c / 4 GB | Development workspace |
 | 102 | openclaw | AIServer | LXC | 16c / 28 GB | Local LLM chat (Ollama + Open-WebUI) |
 | 103 | gaming-bazzite | pve | VM | 7c / 24 GB | Gaming VM with GPU passthrough |
@@ -178,7 +177,7 @@ See [AI Stack](docs/ai-stack.md) for full details.
 | [Game Pipeline](docs/game-pipeline.md) | Automated game download → install → Steam library pipeline |
 | [AI Stack](docs/ai-stack.md) | Tool-calling agent, Download Guardian, verification, diagnostics, RAG, SearXNG, Homelab Agent, nightly tests |
 | [Automation](docs/automation.md) | Download Guardian, Homelab Agent, backups, nightly tests, CrowdSec, Terraform, dual-channel alerts |
-| [Monitoring](docs/monitoring.md) | n8n watchdog workflows, media-monitor agent, Homepage dashboard, storage monitoring |
+| [Monitoring](docs/monitoring.md) | Homelab Agent (7 modules, 3-tier AI repair), n8n watchdog workflows, Homepage dashboard, storage monitoring |
 | [Media Stack](docs/media-stack.md) | Jellyfin, *arr apps, download automation |
 | [Networking](docs/networking.md) | VPN, Cloudflare tunnel, Tailscale mesh |
 | [Lessons Learned](docs/lessons-learned.md) | Gotchas, debugging tips, things that broke |
@@ -188,20 +187,20 @@ See [AI Stack](docs/ai-stack.md) for full details.
 
 ## Quick Stats
 
-- **8 guests** across 3 nodes (7 LXC + 1 VM)
+- **7 guests** across 3 nodes (6 LXC + 1 VM)
 - **55+ Docker containers** on a single LXC
 - **~188 GB total RAM** across the cluster
 - **8 TB DAS** for media storage
 - **GPU passthrough** on 2 nodes (NVIDIA for gaming, AMD iGPU shared across 3 LXCs for ML)
-- **AI tool-calling agent** — 64+ tools, local 35B LLM (qwen3.5:35b-a3b), controls the entire homelab via natural language
-- **Smart routing** — fast 1.7B model for chat, 35B model only for tool-calling actions (3x faster simple responses)
+- **AI tool-calling agent** — 64+ tools, local 35B LLM (qwen3.5:35b-a3b), GPU-accelerated (~22 ms/token via GTT unified memory), controls the entire homelab via natural language
+- **Smart routing** — fast 1.7B model for chat/intent (~8 ms/token), 35B model for tool-calling actions
 - **Conversation memory** — persistent chat history per channel, user preference learning, new release watchlist
 - **3 agent interfaces** — Discord bot, Homepage chat widget, Open WebUI (same brain, same tools)
 - **Librarr (Go)** — 18 MB binary, 13 search sources, Torznab/Newznab API, OPDS feed, Usenet/SABnzbd, multi-user with TOTP 2FA + OIDC/SSO, modern dark Tailwind UI with series grouping and wishlist
 - **Sentinel (Go)** — 11 MB binary, download guardian with SQLite persistence, definitive library verification (Jellyfin/ABS/Kavita/Sonarr/Radarr)
-- **Homelab Agent** — proactive monitoring every 15min, container doctor, source intelligence, import watchdog, download notifications (Discord embeds with posters), failure memory (SQLite), AI escalation
+- **Homelab Agent** — proactive monitoring every 5min, 7 modules (container doctor, source intelligence, import watchdog, torrent doctor, system monitor, notifications, AI escalation), 3-tier AI repair system, failure memory (SQLite)
 - **Service integrations** — Mealie recipe import, Changedetection URL watches, Linkwarden bookmarks, AI auto-tagging for Paperless, Docker container control (restart/stop/start)
-- **45 nightly tests** — comprehensive end-to-end tests at 5 AM, covers all services, Discord results
+- **76 nightly tests** — comprehensive end-to-end tests at 5 AM (~60s), covers all services + smart fixer + escalation, Discord results
 - **SearXNG** — self-hosted web search for AI agent, Homepage dashboard, Open WebUI
 - **Diagnostic toolkit** — file ops, log reading, permission fixes, library rescans for AI escalation
 - **Unified API** — single FastAPI endpoint aggregating all services (Swagger docs included)
@@ -210,7 +209,7 @@ See [AI Stack](docs/ai-stack.md) for full details.
 - **CrowdSec IPS** — 1400+ malicious IPs blocked at firewall, community threat intel
 - **Terraform IaC** — entire cluster defined as code, importable state
 - **9 n8n workflows** — dual-channel Discord alerts, watchdogs, health checks
-- **AI self-healing** — media-monitor agent (reactive) + homelab agent (proactive) auto-fix containers, torrents, VPN, permissions, imports
+- **AI self-healing** — consolidated Homelab Agent with 3-tier repair (1.7b fast tools → 35b smart fixer → Claude Code backstop) auto-fixes containers, torrents, VPN, permissions, imports, configs
 - **Dual-channel Discord alerts** — all watchdogs and bots report to both Discord servers
 - **Zero cloud dependencies** — everything self-hosted (except Cloudflare tunnel for external access)
 

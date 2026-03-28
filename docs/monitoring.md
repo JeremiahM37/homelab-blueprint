@@ -1,6 +1,6 @@
 # Monitoring & Automation
 
-Multiple layers of monitoring ensure services stay healthy with minimal manual intervention.
+Multiple layers of monitoring ensure services stay healthy with minimal manual intervention. The **Homelab Agent** provides proactive autonomous monitoring with a 3-tier AI repair system, while n8n workflows handle specific watchdog tasks.
 
 ---
 
@@ -16,11 +16,12 @@ Multiple layers of monitoring ensure services stay healthy with minimal manual i
 │       (time-series) (container) (host metrics)       │
 └─────────────────────────────────────────────────────┘
 
-┌────────────────┐  ┌──────────────┐  ┌───────────────┐
-│  Uptime Kuma   │  │    n8n       │  │ Media Monitor │
-│ (HTTP/TCP/ping │  │ (workflow    │  │ (LLM-assisted │
-│  checks)       │  │  automation) │  │  health agent)│
-└────────────────┘  └──────────────┘  └───────────────┘
+┌────────────────┐  ┌──────────────┐  ┌───────────────────────┐
+│  Uptime Kuma   │  │    n8n       │  │   Homelab Agent       │
+│ (HTTP/TCP/ping │  │ (workflow    │  │ (7-module proactive   │
+│  checks)       │  │  automation) │  │  monitoring + 3-tier  │
+└────────────────┘  └──────────────┘  │  AI repair system)    │
+                                      └───────────────────────┘
 
 ┌─────────────────────────────────────────────────────┐
 │               Library Verification                   │
@@ -37,6 +38,55 @@ Simple uptime monitoring for all services. Checks HTTP endpoints, TCP ports, and
 
 - Port: 3001
 - Monitors all 35+ Docker services + external endpoints
+
+---
+
+## Homelab Agent (Proactive Autonomous Monitoring)
+
+The primary monitoring system. Runs on AIServer (port 9106) and scans the entire homelab every 5 minutes, detecting and fixing issues before they become visible to the user. Replaced the earlier Media Monitor (LXC 100), consolidating all monitoring into a single agent on the host.
+
+### 7 Modules
+
+| Module | Purpose | Frequency |
+|--------|---------|-----------|
+| **Container Doctor** | Monitors 14 key containers, auto-restarts crashed ones, crash loop guard | Every 5 min |
+| **Source Intelligence** | Checks all 13 Librarr search sources, tracks availability, detects outages | Every 60 min |
+| **Import Watchdog** | Detects stuck downloads and failed imports, auto-retries | Every 5 min |
+| **Torrent Doctor** | qBit health checks, VPN stall detection, orphan routing, dead torrent replacement via Prowlarr, ratio-limit checks | Every 5 min |
+| **System Monitor** | DAS mount verification, disk space with 7-day forecasting, host load/RAM, container resource outliers, Prowlarr indexer auto-retry, Tdarr/Unpackerr/Cloudflared monitoring, n8n workflow checks, download directory permissions | Every 5 min |
+| **Notifications** | Fingerprint-based alert deduplication, resolved notifications, rate limiting, weekly digest | Continuous |
+| **AI Escalation** | 3-tier repair system — Tier 1 (1.7b fast tools) → Tier 2 (35b smart fixer) → Tier 3 (Claude Code) | On failure |
+
+### 3-Tier AI Repair System
+
+When the agent detects an issue, it escalates through three tiers:
+
+```
+Issue detected
+  │
+  ├── Tier 1: qwen3:1.7b (instant, tool calls via Jarvis API)
+  │     Handles ~90% of issues in <1 second
+  │     Tools: restart, permissions, rescan, search, download
+  │     ├── Fixed? → log + notify → done
+  │     └── Failed? → escalate
+  │
+  ├── Tier 2: qwen3.5:35b-a3b (think: true, 19 tools)
+  │     Smart fixer with file editing, command execution, container rebuilds
+  │     Backs up files before editing, logs everything to audit_log.md
+  │     ├── Fixed? → log + notify → done
+  │     └── Failed? → write fix-request.md → escalate
+  │
+  └── Tier 3: Claude Code (runs every 5 hours)
+        Reviews audit_log.md, reverts bad Tier 2 changes
+        Picks up fix-request.md for issues Tiers 1+2 couldn't solve
+```
+
+### Failure Memory
+
+- SQLite database tracks all failures and remediation attempts
+- Prevents repeating the same fix for recurring issues
+- Fingerprint-based alert deduplication — same alert won't spam Discord
+- Resolved notifications sent when issues clear
 
 ---
 
@@ -139,37 +189,6 @@ The Guardian's library verification loop uses these endpoints to confirm downloa
 
 ---
 
-## Media Monitor Agent
-
-An autonomous agent on a dedicated LXC that combines traditional health checks with LLM-assisted reasoning.
-
-### How It Works
-
-1. **Probe phase**: HTTP checks against all services, Docker container status checks
-2. **Rule-based fixes**: Known failure patterns are handled immediately without LLM
-   - Dead network namespace -> restart gluetun + dependent containers
-   - Permission errors -> `chown 1000:1000` on affected directories
-3. **LLM reasoning**: Unknown failures are sent to a local LLM for analysis
-   - Only failing checks are sent (not all 59 probes)
-   - LLM suggests remediation actions
-4. **Execution**: Safe actions are auto-executed; risky ones are logged for review
-5. **Audit**: All actions logged to SQLite database
-6. **Notification**: Discord webhook for significant events (both servers)
-
-### Configuration
-
-```json
-{
-  "check_interval": 300,
-  "services": ["jellyfin", "sonarr", "radarr", "..."],
-  "discord_webhook": "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN",
-  "llm_endpoint": "http://localhost:11434",
-  "llm_model": "qwen2.5:7b"
-}
-```
-
----
-
 ## Homepage Dashboard
 
 ### Sections
@@ -179,7 +198,7 @@ An autonomous agent on a dedicated LXC that combines traditional health checks w
 | **Server Temps** | AIServer, pve, MediaServer CPU/GPU/NVMe temps (via temp APIs on port 9101) |
 | **Backups** | Docker Configs, AIServer, Gaming Server backup status (via backup-status-api on port 9102) |
 | **Disk Usage** | Per-device storage widgets (AIServer, DAS, pve, LXC 200) |
-| **Infrastructure** | Homelab API, Terraform, Open WebUI, SearXNG links |
+| **Infrastructure** | Homelab API, Homelab Agent, Terraform, Open WebUI, SearXNG links |
 | **Media/Books/Games** | All service widgets with stats |
 
 ### AI Chat Widget
@@ -188,7 +207,7 @@ A floating chat bubble (implemented via `custom.js` and `custom.css`) that conne
 
 - Sends messages to `/api/ai/jarvis`
 - Shows **tool-call progress indicators** as the agent works
-- Supports the full 40+ tool set from the dashboard
+- Supports the full 64+ tool set from the dashboard
 
 ### Search Widget
 
@@ -200,6 +219,18 @@ search:
   provider: custom
   url: http://YOUR_DOCKER_HOST_IP:8888/search?q=
 ```
+
+---
+
+## Nightly Tests (76 tests, 5 AM daily)
+
+Comprehensive end-to-end test suite that validates every service in the homelab is functioning correctly.
+
+- **Timer**: `nightly-tests.timer` / `nightly-tests.service`
+- **Location**: `/home/admin/nightly-tests/run_all.sh`
+- **Coverage**: HTTP health checks, API endpoints, SSH connectivity, Docker containers, Proxmox cluster, smart fixer validation, tiered escalation checks, 35b model responsiveness
+- **Notification**: Results posted to Discord via Python JSON builder (avoids newline escaping issues with bash)
+- **Runtime**: ~60 seconds for all 76 tests
 
 ---
 
@@ -220,6 +251,8 @@ search:
 - **Prometheus**: Scrapes metrics from cAdvisor (container metrics) and node-exporter (host metrics)
 - **Grafana**: Dashboards for container resource usage, host performance, network traffic
 - **cAdvisor**: Per-container CPU, memory, network, disk I/O
+  - Optimized config: `housekeeping_interval=300s`, CPU capped at 0.10, memory limit 512 MB
+  - Default cAdvisor settings caused excessive CPU load — tune `--docker_only=true` and disable expensive metrics (process, percpu, sched, memory_numa)
 - **node-exporter**: Host CPU, memory, disk, network
 
 ### CrowdSec

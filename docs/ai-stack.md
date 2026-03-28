@@ -1,6 +1,6 @@
 # AI / ML Stack
 
-Multiple dedicated LXC containers on a 128 GB RAM node for running local LLMs, ML research, AI experiments, and AI-powered automation. The centerpiece is a **tool-calling AI agent** that controls the entire homelab via natural language.
+Multiple dedicated LXC containers on a 128 GB RAM node for running local LLMs, ML research, AI experiments, and AI-powered automation. The centerpiece is a **tool-calling AI agent** that controls the entire homelab via natural language, backed by a **3-tier AI repair system** that autonomously fixes issues.
 
 ---
 
@@ -11,8 +11,8 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │
 ├── LXC 102 — "openclaw" (28 GB — LLM Chat)
 │   ├── Ollama (model serving, 2min idle timeout)
-│   │   ├── qwen3.5:35b-a3b (23 GB, chat + tool calling)
-│   │   ├── qwen3:1.7b (1.4 GB, Discord bot intent parsing)
+│   │   ├── qwen3.5:35b-a3b (34.5 GB on GPU, chat + tool calling)
+│   │   ├── qwen3:1.7b (6.2 GB on GPU, intent parsing + Tier 1 repairs)
 │   │   ├── nomic-embed-text (275 MB, document RAG embeddings)
 │   │   └── qwen3:4b, qwen3:0.6b (available, not active)
 │   ├── Open-WebUI (chat interface, port 8080)
@@ -29,10 +29,6 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │   ├── GPU passthrough (shared iGPU)
 │   └── DeBERTa fine-tuning for AI text detection
 │
-├── LXC 100 — "media-monitor" (8 GB — Health Agent)
-│   ├── Ollama qwen2.5:7b (local reasoning)
-│   └── Automated health check + auto-fix + torrent recovery
-│
 ├── Host services:
 │   ├── Homelab API (port 9105) — unified FastAPI with AI agent (64+ tools)
 │   │   ├── /api/ai/jarvis — tool-calling agent endpoint
@@ -41,11 +37,14 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │   │   ├── /api/diag/* — diagnostic tools
 │   │   ├── /api/gaming/* — game search + download
 │   │   └── /api/system/storage — per-node disk usage
-│   ├── Homelab Agent (port 9106) — proactive autonomous monitoring
+│   ├── Homelab Agent (port 9106) — proactive autonomous monitoring (7 modules)
 │   │   ├── Container doctor (14 containers, auto-restart)
 │   │   ├── Source intelligence (13 Librarr sources, hourly)
 │   │   ├── Import watchdog (stuck downloads, failed imports)
-│   │   └── AI escalation (to /api/ai/jarvis for complex failures)
+│   │   ├── Torrent doctor (qBit health, VPN stalls, orphan routing)
+│   │   ├── System monitor (DAS, disk forecasting, host load, container resources)
+│   │   ├── Notifications (deduplication, resolved alerts, weekly digest)
+│   │   └── AI escalation (3-tier repair: 1.7b → 35b → Claude Code)
 │   ├── Document RAG (port 9103) — vector search over Paperless docs
 │   ├── Terraform status (port 9104) — IaC state API
 │   └── Temp API (port 9101) — hardware sensor data
@@ -59,12 +58,15 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
     └── *ai command — 64+ tools via agent loop
 ```
 
-### GPU Note (AMD 8060S iGPU)
-- Only **2 GB VRAM** — models don't fit, weights stay in system RAM
-- GPU used for compute (matrix ops), not weight storage
-- System RAM used for weights **counts against LXC memory limit**
-- VRAM is separate and **bypasses** container limits
-- Shared across LXCs 102, 105, 106 via /dev/dri + /dev/kfd
+### GPU (AMD 8060S iGPU — Unified Memory)
+
+The Radeon 8060S on Strix Halo uses **GTT (Graphics Translation Table) memory** — a unified memory architecture that allows models to be loaded fully on GPU using system RAM.
+
+- **61.7 GB GTT available** — both active models load entirely into GPU memory
+- `qwen3.5:35b-a3b`: 34.5 GB on GPU, ~22 ms/token
+- `qwen3:1.7b`: 6.2 GB on GPU, ~8 ms/token
+- Models run **fully GPU-accelerated** via GTT, not CPU-only
+- Shared across LXCs 102, 105, 106 via /dev/dri + /dev/kfd passthrough
 - Not exclusive like RTX 2070 on pve (fully owned by VM 103)
 
 ---
@@ -73,18 +75,21 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 
 The `/api/ai/jarvis` endpoint is a full tool-calling agent — not just a chat wrapper. It uses Ollama's native tool calling with qwen3.5:35b-a3b to decide which actions to take, execute them, and synthesize results.
 
-### Agent Loop
+### Agent Loop (Intent Routing)
 
 ```
 User message (any interface)
-  └── Homelab API /api/ai/jarvis
-        └── Build tool definitions (64+ tools)
-              └── Send to Ollama with tool_call capability
-                    └── LLM returns tool_call decisions
-                          └── Execute tool calls against homelab APIs
-                                └── Feed results back to LLM
-                                      └── LLM generates final response
-                                            (or makes more tool calls)
+  └── qwen3:1.7b intent classifier
+        ├── "chat" → qwen3:1.7b generates simple response (~8ms/token)
+        └── "action" → qwen3:1.7b tool calling (64+ tools, sub-second parsing)
+              └── Execute tool calls against homelab APIs
+                    └── Feed results back to LLM
+                          └── Generate response (or make more tool calls)
+
+Homelab Agent detects issue
+  └── Tier 1: qwen3:1.7b tries Jarvis tools (fast, <1 second)
+        └── fails → Tier 2: qwen3.5:35b-a3b smart fixer (think: true, 19 tools)
+              └── fails → Tier 3: writes fix-request.md → Claude Code (every 5 hours)
 ```
 
 ### Interfaces
@@ -95,6 +100,7 @@ The same agent brain powers three interfaces:
 |-----------|--------|-------|
 | **Discord bot** | `*ai <anything>` in Discord | Sub-second intent parsing via qwen3:1.7b, then routes to agent |
 | **Homepage chat widget** | Floating bubble on dashboard | Custom JS/CSS with tool-call progress indicators |
+| **Mobile PWA** | `/app` endpoint | AI chat with 120s timeout for mobile use |
 | **Open WebUI** | MCP tools via mcpo proxy | Full chat UI with conversation history |
 
 ### Tool Categories (64+)
@@ -119,6 +125,53 @@ The same agent brain powers three interfaces:
 | **System** | Temps, storage, backups | Per-node disk usage, trigger backups, sensor data |
 | **Transcoding** | Tdarr | Stats, queue status |
 | **Memory** | Conversation + preferences | Chat history, **watchlist for new releases**, preference learning |
+
+---
+
+## 3-Tier AI Repair System
+
+The homelab uses a tiered approach to autonomous repair, escalating from fast/cheap to slow/powerful only when needed.
+
+### Tier 1 — Fast Tool Calls (qwen3:1.7b)
+
+- **Model**: qwen3:1.7b (~8 ms/token, 6.2 GB on GPU)
+- **When**: First response to any detected issue
+- **How**: Calls Jarvis API tools directly — restart containers, fix permissions, rescan libraries, search/download, check status
+- **Handles**: ~90% of issues in under 1 second
+- **Example**: Container crashed → restart via Docker API → verify it came back → done
+
+### Tier 2 — Smart Fixer (qwen3.5:35b-a3b)
+
+- **Model**: qwen3.5:35b-a3b with `think: true` (~22 ms/token, 34.5 GB on GPU)
+- **When**: Tier 1 failed or the issue requires deeper reasoning
+- **Tools (19)**: Read/edit files, run commands on LXC 200 and AIServer, manage torrents, rebuild Docker containers, Prowlarr search, library verification
+- **Safety**: Backs up files before editing, logs all actions to `audit_log.md`
+- **Example**: Import pipeline broken → read container logs → identify config issue → edit config file (with backup) → rebuild container → verify fix
+
+### Tier 3 — Claude Code (Scheduled)
+
+- **When**: Runs every 5 hours on a schedule
+- **What**: Reviews Tier 2's `audit_log.md` and reverts bad changes. Handles anything Tiers 1 and 2 couldn't fix. Picks up `fix-request.md` files written by the agent.
+- **Example**: Tier 2 edited a config incorrectly → Claude Code reviews the audit log → reverts the change → applies correct fix → updates documentation
+
+### Escalation Flow
+
+```
+Issue detected by Homelab Agent
+  │
+  ├── Tier 1: qwen3:1.7b (instant, tool calls)
+  │     ├── Fixed? → log + notify → done
+  │     └── Failed? → escalate
+  │
+  ├── Tier 2: qwen3.5:35b-a3b (think: true, 19 tools)
+  │     ├── Fixed? → log to audit_log.md + notify → done
+  │     └── Failed? → write fix-request.md → escalate
+  │
+  └── Tier 3: Claude Code (every 5 hours)
+        ├── Review audit_log.md → revert bad changes
+        ├── Pick up fix-request.md → investigate + fix
+        └── Handle anything Tiers 1+2 couldn't
+```
 
 ---
 
@@ -218,6 +271,52 @@ Download Guardian fails
 
 ---
 
+## Homelab Agent (Proactive Autonomous Monitoring)
+
+A proactive monitoring agent running on AIServer (port 9106) that scans the entire homelab every 5 minutes, detecting and fixing issues before they become visible to the user. Uses the 3-tier AI repair system for escalation.
+
+### Architecture
+
+```
+systemd service (continuous, 5min scan loop)
+  └── agent.py
+        ├── container_doctor — monitors 14 key containers, auto-restart, crash loop detection
+        ├── source_intelligence — checks 13 Librarr search sources hourly, tracks availability
+        ├── import_watchdog — stuck downloads, failed imports, auto-retry
+        ├── torrent_doctor — qBit health, VPN stall detection, orphan routing, dead torrent replacement
+        ├── system_monitor — DAS mount, disk space + 7-day forecasting, host load/RAM, container resources
+        ├── notifications — alert deduplication, resolved notifications, rate limiting, weekly digest
+        └── ai_escalation — 3-tier repair (1.7b → 35b → Claude Code)
+```
+
+### Modules
+
+| Module | Purpose | Frequency |
+|--------|---------|-----------|
+| **Container Doctor** | Monitors 14 key containers, auto-restarts crashed ones, crash loop guard | Every 5 min |
+| **Source Intelligence** | Checks all 13 Librarr sources, tracks availability, detects outages | Every 60 min |
+| **Import Watchdog** | Detects stuck downloads and failed imports, auto-retries | Every 5 min |
+| **Torrent Doctor** | qBit health checks, VPN stall detection, orphan routing, dead torrent replacement via Prowlarr, ratio-limit checks | Every 5 min |
+| **System Monitor** | DAS mount verification, disk space with 7-day forecasting, host load/RAM, container resource outliers, Prowlarr indexer auto-retry, Tdarr/Unpackerr/Cloudflared monitoring, n8n workflow checks, download directory permissions | Every 5 min |
+| **Notifications** | Fingerprint-based alert deduplication, resolved notifications, rate limiting, weekly digest | Continuous |
+| **AI Escalation** | 3-tier repair system — Tier 1 (1.7b fast tools) → Tier 2 (35b smart fixer) → Tier 3 (Claude Code) | On failure |
+
+### Failure Memory
+
+- SQLite database tracks all failures and remediation attempts
+- Prevents repeating the same fix for recurring issues
+- Learns patterns (e.g., "this container crashes every Tuesday at 3 AM")
+- Discord notifications for all actions taken (with deduplication)
+
+### Key Design Decisions
+
+- **No LLM for routine tasks** — uses rule-based logic for known patterns, only escalates to AI for complex unknowns
+- **3-tier escalation** — fast/cheap model first, expensive model only when needed, Claude Code as final backstop
+- **Failure memory prevents loops** — if a fix was tried and failed, it won't be retried until cooldown expires
+- **Fingerprint-based deduplication** — same alert won't spam Discord; resolved alerts are sent when issues clear
+
+---
+
 ## SearXNG (Self-Hosted Web Search)
 
 A self-hosted metasearch engine running on LXC 200, port 8888. Aggregates results from multiple search engines without tracking.
@@ -281,15 +380,15 @@ Per-node disk usage monitoring:
 
 ---
 
-## Local LLM Chat (LXC 102)
+## Ollama Models (LXC 102)
 
-### Ollama
+| Model | Size on GPU | Speed | Purpose |
+|-------|-------------|-------|---------|
+| **qwen3.5:35b-a3b** | 34.5 GB (GTT) | ~22 ms/token | Chat, tool calling, Tier 2 smart fixer |
+| **qwen3:1.7b** | 6.2 GB (GTT) | ~8 ms/token | Intent parsing, Tier 1 fast repairs |
+| **nomic-embed-text** | 275 MB | — | Document RAG embeddings |
 
-- Serves large language models locally
-- Current model: `qwen3.5:35b-a3b` (23 GB, Q4_K_M quantization)
-- **Native tool calling** support — used by the AI agent
-- API endpoint: `http://<lxc-ip>:11434`
-- Runs as a systemd service (auto-start on boot)
+Both active models load entirely into GPU memory via GTT (61.7 GB available). The 2-minute idle timeout (`OLLAMA_KEEP_ALIVE=2m`) frees GPU memory when models are not in use.
 
 ### Open-WebUI
 
@@ -347,84 +446,12 @@ pip install torch --index-url https://rocm.nightlies.amd.com/v2/gfx1151/
 
 ---
 
----
-
-## Media Monitor Agent (LXC 100)
-
-An autonomous health monitoring agent that:
-
-1. Runs periodic health checks on all Docker services (every 5 minutes)
-2. Uses a small local LLM to reason about failures and suggest fixes
-3. Executes safe remediation actions (restart containers, fix permissions)
-4. Logs all actions to a SQLite audit database
-5. Sends Discord notifications for significant events
-
-### Architecture
-
-```
-systemd timer (5min)
-  └── monitor.py
-        ├── HTTP probes (all services)
-        ├── Docker health checks (via SSH to LXC 200)
-        ├── Rule-based pre-LLM fixes (known patterns)
-        ├── LLM reasoning (for unknown failures)
-        └── Action execution + audit log
-```
-
-### Optimizations
-
-- Only sends failing checks to the LLM (not all 59 probes)
-- `num_ctx=8192` for sufficient context
-- Fallback summary mode if LLM is unavailable
-- Rule-based fixes for known issues (e.g., dead network namespace -> restart gluetun)
-
----
-
-## Homelab Agent (Proactive Autonomous Monitoring)
-
-A proactive monitoring agent running on AIServer (port 9106) that scans the entire homelab every 15 minutes, detecting and fixing issues before they become visible to the user.
-
-### Architecture
-
-```
-systemd service (continuous, 15min scan loop)
-  └── agent.py
-        ├── container_doctor — monitors 14 key containers, auto-restart, crash loop detection
-        ├── source_intelligence — checks 13 Librarr search sources hourly, tracks availability
-        ├── import_watchdog — stuck downloads, failed imports, auto-retry
-        └── ai_escalation — complex failures → /api/ai/jarvis for AI-driven diagnosis
-```
-
-### Modules
-
-| Module | Purpose | Frequency |
-|--------|---------|-----------|
-| **Container Doctor** | Monitors 14 key containers, auto-restarts crashed ones, crash loop guard | Every 15 min |
-| **Source Intelligence** | Checks all 13 Librarr sources, tracks availability, detects outages | Every 60 min |
-| **Import Watchdog** | Detects stuck downloads and failed imports, auto-retries | Every 15 min |
-| **AI Escalation** | Escalates complex/recurring failures to AI agent for diagnosis | On failure |
-
-### Failure Memory
-
-- SQLite database tracks all failures and remediation attempts
-- Prevents repeating the same fix for recurring issues
-- Learns patterns (e.g., "this container crashes every Tuesday at 3 AM")
-- Discord notifications for all actions taken
-
-### Key Design Decisions
-
-- **No LLM for routine tasks** — uses rule-based logic for known patterns, only escalates to AI for complex unknowns
-- **Separate from media-monitor** — media-monitor (LXC 100) handles reactive health checks; homelab-agent handles proactive monitoring and source intelligence
-- **Failure memory prevents loops** — if a fix was tried and failed, it won't be retried until cooldown expires
-
----
-
-## Nightly Tests (45 tests, 5 AM daily)
+## Nightly Tests (76 tests, 5 AM daily)
 
 Comprehensive end-to-end test suite that validates every service in the homelab is functioning correctly.
 
 - **Timer**: `nightly-tests.timer` / `nightly-tests.service`
 - **Location**: `/home/admin/nightly-tests/run_all.sh`
-- **Coverage**: HTTP health checks, API endpoints, SSH connectivity, Docker containers, Proxmox cluster
+- **Coverage**: HTTP health checks, API endpoints, SSH connectivity, Docker containers, Proxmox cluster, smart fixer validation, tiered escalation checks, 35b model responsiveness
 - **Notification**: Results posted to Discord with pass/fail summary
-- **Runtime**: ~48 seconds for all 45 tests
+- **Runtime**: ~60 seconds for all 76 tests
