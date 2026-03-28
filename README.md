@@ -39,7 +39,7 @@ This repo documents the architecture, services, and lessons learned. No credenti
 ├──────────────────┴──────────────────────┴───────────────────────────────────┤
 │                                                                             │
 │   ┌── AI Agent Brain ──────────────────────────────────────────────────┐    │
-│   │  qwen3.5:35b-a3b on Ollama (native tool calling, 48 tools)       │    │
+│   │  qwen3.5:35b-a3b on Ollama (native tool calling, 48+ tools)      │    │
 │   │                                                                    │    │
 │   │  Interfaces:                                                       │    │
 │   │    Discord bot (*ai) ──┐                                           │    │
@@ -51,6 +51,9 @@ This repo documents the architecture, services, and lessons learned. No credenti
 │   │    Sentinel (Go, download guardian, library verification)         │    │
 │   │    Diagnostics (file ops, log reading, library rescans)           │    │
 │   │    SearXNG (self-hosted web search) ─── Open WebUI + Homepage     │    │
+│   │    Homelab Agent (proactive: container doctor, source intel,      │    │
+│   │      import watchdog, AI escalation — every 15min, port 9106)    │    │
+│   │    Nightly Tests (45 tests at 5 AM, Discord results)             │    │
 │   └────────────────────────────────────────────────────────────────────┘    │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -138,12 +141,14 @@ All three interfaces share the same agent brain:
 
 | System | Purpose |
 |--------|---------|
-| **Librarr** | Go binary (17 MB), 13 search sources, Torznab/Newznab API, OPDS feed, embedded web UI |
-| **Sentinel** | Go binary (11 MB), download guardian with persistent job tracking, definitive library verification |
+| **Librarr** | Go binary (17 MB), 13 search sources, Torznab/Newznab API, OPDS feed, Usenet/SABnzbd, modern Tailwind dark UI, series grouping, wishlist |
+| **Sentinel** | Go binary (11 MB), download guardian with SQLite persistence, definitive library verification |
+| **Homelab Agent** | Proactive monitoring (15min), container doctor, source intelligence, import watchdog, failure memory, AI escalation |
 | **Diagnostic Tools** | File ops, log reading, permission fixes, library rescans — for AI escalation |
-| **SearXNG** | Self-hosted web search for AI and dashboard |
+| **SearXNG** | Self-hosted web search for AI agent, Homepage, Open WebUI |
 | **Paperless Tagging** | AI-driven document tagging and correspondent assignment |
 | **Gaming API** | Game search, ROM download, sync status, Bazzite VM control |
+| **Nightly Tests** | 45 end-to-end tests at 5 AM, Discord results notification |
 
 See [AI Stack](docs/ai-stack.md) for full details.
 
@@ -171,8 +176,8 @@ See [AI Stack](docs/ai-stack.md) for full details.
 | [Docker Services](docs/docker-services.md) | All 55+ containers running on LXC 200 |
 | [Gaming VM](docs/gaming-vm.md) | Bazzite setup, GPU passthrough, Sunshine/Moonlight streaming |
 | [Game Pipeline](docs/game-pipeline.md) | Automated game download → install → Steam library pipeline |
-| [AI Stack](docs/ai-stack.md) | Tool-calling agent, Download Guardian, verification, diagnostics, RAG, SearXNG |
-| [Automation](docs/automation.md) | Download Guardian, backups, CrowdSec, Terraform, dual-channel alerts |
+| [AI Stack](docs/ai-stack.md) | Tool-calling agent, Download Guardian, verification, diagnostics, RAG, SearXNG, Homelab Agent, nightly tests |
+| [Automation](docs/automation.md) | Download Guardian, Homelab Agent, backups, nightly tests, CrowdSec, Terraform, dual-channel alerts |
 | [Monitoring](docs/monitoring.md) | n8n watchdog workflows, media-monitor agent, Homepage dashboard, storage monitoring |
 | [Media Stack](docs/media-stack.md) | Jellyfin, *arr apps, download automation |
 | [Networking](docs/networking.md) | VPN, Cloudflare tunnel, Tailscale mesh |

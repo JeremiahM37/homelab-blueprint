@@ -265,10 +265,11 @@ services:
     restart: unless-stopped
 
   # Librarr — Go binary, runs inside gluetun network (see gluetun ports)
-  # Rewritten from Python Flask. 17 MB binary, 13 search sources,
-  # Torznab/Newznab API, OPDS feed, embedded web UI.
+  # 17 MB static binary, 13 search sources, Torznab/Newznab API,
+  # OPDS feed, Usenet/SABnzbd, modern Tailwind dark UI, series grouping,
+  # wishlist, rate limiting. Dockerfile uses multi-stage Go build.
   librarr:
-    build: ./librarr
+    build: ./librarr-go
     container_name: librarr
     network_mode: "service:gluetun"
     environment:
@@ -278,8 +279,11 @@ services:
       - QB_USER=<QBIT_USER>
       - QB_PASS=<QBIT_PASSWORD>
       - DB_PATH=/data/librarr.db
+      - AUTH_USERNAME=<LIBRARR_USER>
+      - AUTH_PASSWORD=<LIBRARR_PASSWORD>
+      - TORZNAB_API_KEY=<YOUR_TORZNAB_API_KEY>
     volumes:
-      - ./librarr/data:/data
+      - ./librarr-go/data:/data
       - /data/media/books/ebooks/incoming:/books-incoming
       - /data/media/books/audiobooks:/audiobooks-incoming
     depends_on:
