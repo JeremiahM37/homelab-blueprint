@@ -34,7 +34,7 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │   └── Automated health check + auto-fix + torrent recovery
 │
 ├── Host services:
-│   ├── Homelab API (port 9105) — unified FastAPI with AI agent (48+ tools)
+│   ├── Homelab API (port 9105) — unified FastAPI with AI agent (64+ tools)
 │   │   ├── /api/ai/jarvis — tool-calling agent endpoint
 │   │   ├── /api/guardian/* — proxies to Go Sentinel
 │   │   ├── /api/verify/* — proxies to Go Sentinel library verification
@@ -56,7 +56,7 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │   └── JSON API at /search?q=...&format=json
 │
 └── Discord Bot AI (runs on LXC 200, calls Ollama on LXC 102)
-    └── *ai command — 48 tools via agent loop
+    └── *ai command — 64+ tools via agent loop
 ```
 
 ### GPU Note (AMD 8060S iGPU)
@@ -78,7 +78,7 @@ The `/api/ai/jarvis` endpoint is a full tool-calling agent — not just a chat w
 ```
 User message (any interface)
   └── Homelab API /api/ai/jarvis
-        └── Build tool definitions (48 tools)
+        └── Build tool definitions (64+ tools)
               └── Send to Ollama with tool_call capability
                     └── LLM returns tool_call decisions
                           └── Execute tool calls against homelab APIs
@@ -97,25 +97,28 @@ The same agent brain powers three interfaces:
 | **Homepage chat widget** | Floating bubble on dashboard | Custom JS/CSS with tool-call progress indicators |
 | **Open WebUI** | MCP tools via mcpo proxy | Full chat UI with conversation history |
 
-### Tool Categories (48+)
+### Tool Categories (64+)
 
 | Category | Tools | Examples |
 |----------|-------|---------|
 | **Web search** | SearXNG integration | Search the web, summarize results |
 | **Media control** | Jellyfin, Sonarr, Radarr, Jellyseerr | Now playing, calendar, request movies/TV |
 | **Downloads** | qBittorrent, gluetun | Speed, list torrents, pause/resume all |
-| **Books** | Librarr (Go), Audiobookshelf, Calibre, Kavita | Search 13 sources, download, request, recent additions |
+| **Books** | Librarr (Go), Audiobookshelf, Calibre, Kavita | Search 13 sources, download, request, wishlist |
 | **Guardian** | Sentinel (Go) | Create guardian jobs, check status, verify library arrival |
-| **Documents** | Paperless | Search, tag, set correspondents, RAG queries |
+| **Documents** | Paperless | Search, tag, set correspondents, RAG queries, **AI auto-tag** |
 | **Photos** | Immich | Search, list albums, upload |
-| **Recipes** | Mealie | Search, import from URL, random, meal plan |
+| **Recipes** | Mealie | Search, **import from URL**, random, **meal plan** |
 | **Inventory** | Homebox | Search items, list locations |
 | **Gaming** | Gamarr, Bazzite | Search games, download ROMs, VM status, sync status |
-| **Monitoring** | Uptime Kuma, Changedetection | Website changes, uptime status |
+| **Monitoring** | Changedetection | **Add/remove/list URL watches**, website changes |
+| **Bookmarks** | Linkwarden | **Save URLs, search bookmarks, list collections** |
+| **Containers** | Docker on LXC 200 | **List, restart, stop, start** individual containers |
 | **Diagnostics** | File ops, logs, rescans | Check files, fix permissions, read container logs |
 | **Verification** | Sentinel library checks | Verify items exist with real API proof (file paths, durations, page counts) |
 | **System** | Temps, storage, backups | Per-node disk usage, trigger backups, sensor data |
 | **Transcoding** | Tdarr | Stats, queue status |
+| **Memory** | Conversation + preferences | Chat history, **watchlist for new releases**, preference learning |
 
 ---
 

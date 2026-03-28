@@ -39,7 +39,7 @@ This repo documents the architecture, services, and lessons learned. No credenti
 ├──────────────────┴──────────────────────┴───────────────────────────────────┤
 │                                                                             │
 │   ┌── AI Agent Brain ──────────────────────────────────────────────────┐    │
-│   │  qwen3.5:35b-a3b on Ollama (native tool calling, 48+ tools)      │    │
+│   │  qwen3.5:35b-a3b on Ollama (native tool calling, 64+ tools)      │    │
 │   │                                                                    │    │
 │   │  Interfaces:                                                       │    │
 │   │    Discord bot (*ai) ──┐                                           │    │
@@ -114,7 +114,7 @@ Download clients (qBittorrent, Librarr, Gamarr) route through a **gluetun** cont
 
 ## AI Assistant
 
-The homelab is controlled by a **tool-calling AI agent** powered by a local 35B-parameter LLM (qwen3.5:35b-a3b) running on Ollama with native tool calling. The agent has **48+ tools** (51 MCP tools) for managing every aspect of the homelab, including Librarr search/download, Sentinel guardian/verification, and diagnostics. A proactive **Homelab Agent** scans every 15 minutes with container doctor, source intelligence, import watchdog, and AI escalation modules.
+The homelab is controlled by a **tool-calling AI agent** powered by a local 35B-parameter LLM (qwen3.5:35b-a3b) running on Ollama with native tool calling. The agent has **64+ tools** (64+ tools) for managing every aspect of the homelab, including Librarr search/download, Sentinel guardian/verification, and diagnostics. A proactive **Homelab Agent** scans every 15 minutes with container doctor, source intelligence, import watchdog, and AI escalation modules.
 
 ### How It Works
 
@@ -193,12 +193,14 @@ See [AI Stack](docs/ai-stack.md) for full details.
 - **~188 GB total RAM** across the cluster
 - **8 TB DAS** for media storage
 - **GPU passthrough** on 2 nodes (NVIDIA for gaming, AMD iGPU shared across 3 LXCs for ML)
-- **AI tool-calling agent** — 48+ tools, local 35B LLM (qwen3.5:35b-a3b), controls the entire homelab via natural language
-- **51 MCP tools** — exposed via mcpo proxy, includes Librarr search/download, guardian, verification, diagnostics
+- **AI tool-calling agent** — 64+ tools, local 35B LLM (qwen3.5:35b-a3b), controls the entire homelab via natural language
+- **Smart routing** — fast 1.7B model for chat, 35B model only for tool-calling actions (3x faster simple responses)
+- **Conversation memory** — persistent chat history per channel, user preference learning, new release watchlist
 - **3 agent interfaces** — Discord bot, Homepage chat widget, Open WebUI (same brain, same tools)
-- **Librarr (Go)** — 17 MB binary, 13 search sources, Torznab/Newznab API, OPDS feed, Usenet/SABnzbd, modern dark UI with Tailwind, series grouping, wishlist, rate limiting
+- **Librarr (Go)** — 18 MB binary, 13 search sources, Torznab/Newznab API, OPDS feed, Usenet/SABnzbd, multi-user with TOTP 2FA + OIDC/SSO, modern dark Tailwind UI with series grouping and wishlist
 - **Sentinel (Go)** — 11 MB binary, download guardian with SQLite persistence, definitive library verification (Jellyfin/ABS/Kavita/Sonarr/Radarr)
-- **Homelab Agent** — proactive monitoring every 15min, container doctor (14 containers), source intelligence (13 sources), import watchdog, failure memory (SQLite), AI escalation
+- **Homelab Agent** — proactive monitoring every 15min, container doctor, source intelligence, import watchdog, download notifications (Discord embeds with posters), failure memory (SQLite), AI escalation
+- **Service integrations** — Mealie recipe import, Changedetection URL watches, Linkwarden bookmarks, AI auto-tagging for Paperless, Docker container control (restart/stop/start)
 - **45 nightly tests** — comprehensive end-to-end tests at 5 AM, covers all services, Discord results
 - **SearXNG** — self-hosted web search for AI agent, Homepage dashboard, Open WebUI
 - **Diagnostic toolkit** — file ops, log reading, permission fixes, library rescans for AI escalation

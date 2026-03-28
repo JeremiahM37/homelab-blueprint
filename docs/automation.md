@@ -6,7 +6,7 @@ Everything built to run autonomously with minimal human intervention.
 
 ## Discord AI Bot
 
-A custom Discord bot (`discord-bot` container, port 3003) with a local LLM-powered `*ai` command that routes natural language to 48 tools across 15+ services.
+A custom Discord bot (`discord-bot` container, port 3003) with a local LLM-powered `*ai` command that routes natural language to 64+ tools across 15+ services.
 
 ### Architecture
 
@@ -23,7 +23,7 @@ Discord message
 ### Performance
 - Intent parsing: **<1 second** (think mode disabled)
 - Tool-calling agent: 2-10 seconds depending on tool chain complexity
-- System prompt: ~1,141 tokens, 48 tools
+- System prompt: ~1,141 tokens, 64+ tools
 - Model: qwen3:1.7b (~1.4GB) for intent, qwen3.5:35b-a3b (23GB) for agent
 - Cost: **$0** (local inference)
 
@@ -257,12 +257,16 @@ A proactive monitoring agent on AIServer (port 9106) that scans the entire homel
 | **Source Intelligence** | Checks all 13 Librarr search sources, tracks availability | Every 60 min |
 | **Import Watchdog** | Detects stuck downloads and failed imports, auto-retries | Every 15 min |
 | **AI Escalation** | Escalates complex failures to `/api/ai/jarvis` for AI diagnosis | On failure |
+| **Download Notifications** | Checks Sonarr/Radarr history for new completions, posts Discord embeds with poster art | Every 15 min |
+| **Release Watcher** | Searches web for new releases from watched series/authors | Every 60 min |
 
 ### Design
 
 - SQLite failure memory prevents repeating failed fixes
+- Conversation memory persists chat history per channel (Discord, Homepage, etc.)
+- User preference learning tracks download patterns (authors, genres)
 - Separate from media-monitor (LXC 100) which handles reactive health checks
-- Discord notifications for all actions
+- Discord notifications for all actions (download completions include poster thumbnails)
 
 ---
 
