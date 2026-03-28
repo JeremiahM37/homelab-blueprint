@@ -34,7 +34,7 @@ All services run on a single privileged LXC container (12 cores, 24 GB RAM) usin
 
 | Container | Port | Purpose | Notes |
 |-----------|------|---------|-------|
-| **gamarr** | 5057 | Game/ROM search + download | Custom Flask app (via VPN) |
+| **gamarr** | 5057 | Game/ROM search + download | Go binary, 24 platforms, Prowlarr+Myrient+Vimm sources (via VPN) |
 | **gamevault** | 8087 | PC game library server | With PostgreSQL backend |
 | **romm** | 8086 | ROM manager | With MariaDB backend |
 

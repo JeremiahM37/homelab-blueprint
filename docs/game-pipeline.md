@@ -23,12 +23,15 @@ Search & Download (LXC 200)          Sync & Install (Gaming VM)
 
 ### 1. Gamarr (Search + Download Trigger)
 
-Custom Flask app running inside the gluetun VPN container. Searches for games via:
+Go binary (~15 MB static build) running inside the gluetun VPN container. Supports 24 platforms and 3 search sources:
 
 - **Prowlarr** — Aggregates torrent indexers (for PC repacks, ROMs via torrent)
 - **Myrient** — Direct download for verified ROM sets (No-Intro, Redump)
+- **Vimm** — Fallback DDL source for retro ROMs
 
-Gamarr sends found torrents/magnets to qBittorrent for downloading.
+Features: safety scoring for downloads, library management with SQLite, wishlist, Prometheus metrics, download monitoring, 43 automated e2e tests.
+
+Gamarr sends found torrents/magnets to qBittorrent or downloads directly (DDL) for organizing.
 
 ### 2. qBittorrent (Download Client)
 
