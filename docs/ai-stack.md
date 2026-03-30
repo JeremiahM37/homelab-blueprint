@@ -41,7 +41,7 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │   │   ├── Container doctor (14 containers, auto-restart)
 │   │   ├── Source intelligence (13 Librarr sources, hourly)
 │   │   ├── Import watchdog (stuck downloads, failed imports)
-│   │   ├── Torrent doctor (qBit health, VPN stalls, orphan routing)
+│   │   ├── Torrent doctor (qBit health, VPN stalls, dead torrent replacement, game auto-organize)
 │   │   ├── System monitor (DAS, disk forecasting, host load, container resources)
 │   │   ├── Notifications (deduplication, resolved alerts, weekly digest)
 │   │   └── AI escalation (3-tier repair: 1.7b → 35b → Claude Code)
@@ -296,7 +296,7 @@ systemd service (continuous, 5min scan loop)
 | **Container Doctor** | Monitors 14 key containers, auto-restarts crashed ones, crash loop guard | Every 5 min |
 | **Source Intelligence** | Checks all 13 Librarr sources, tracks availability, detects outages | Every 60 min |
 | **Import Watchdog** | Detects stuck downloads and failed imports, auto-retries | Every 5 min |
-| **Torrent Doctor** | qBit health checks, VPN stall detection, orphan routing, dead torrent replacement via Prowlarr, ratio-limit checks | Every 5 min |
+| **Torrent Doctor** | qBit health checks, VPN stall detection, dead torrent replacement (0 seeds >5 min → search Gamarr/Prowlarr for alternative), game auto-organize (incoming → vault), Gamarr stuck/failed job retry, orphan routing, ratio-limit checks | Every 5 min |
 | **System Monitor** | DAS mount verification, disk space with 7-day forecasting, host load/RAM, container resource outliers, Prowlarr indexer auto-retry, Tdarr/Unpackerr/Cloudflared monitoring, n8n workflow checks, download directory permissions | Every 5 min |
 | **Notifications** | Fingerprint-based alert deduplication, resolved notifications, rate limiting, weekly digest | Continuous |
 | **AI Escalation** | 3-tier repair system — Tier 1 (1.7b fast tools) → Tier 2 (35b smart fixer) → Tier 3 (Claude Code) | On failure |

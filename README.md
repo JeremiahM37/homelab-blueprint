@@ -148,7 +148,7 @@ All three interfaces share the same agent brain:
 | **SearXNG** | Self-hosted web search for AI agent, Homepage, Open WebUI |
 | **Paperless Tagging** | AI-driven document tagging and correspondent assignment |
 | **Gaming API** | Game search, ROM download, sync status, Bazzite VM control |
-| **Nightly Tests** | 76 end-to-end tests at 5 AM (~60s), Discord results notification |
+| **Nightly Tests** | 88 end-to-end tests at 5 AM (~60s), Discord results notification |
 
 See [AI Stack](docs/ai-stack.md) for full details.
 
@@ -200,7 +200,7 @@ See [AI Stack](docs/ai-stack.md) for full details.
 - **Sentinel (Go)** — 11 MB binary, download guardian with SQLite persistence, definitive library verification (Jellyfin/ABS/Kavita/Sonarr/Radarr)
 - **Homelab Agent** — proactive monitoring every 5min, 7 modules (container doctor, source intelligence, import watchdog, torrent doctor, system monitor, notifications, AI escalation), 3-tier AI repair system, failure memory (SQLite)
 - **Service integrations** — Mealie recipe import, Changedetection URL watches, Linkwarden bookmarks, AI auto-tagging for Paperless, Docker container control (restart/stop/start)
-- **76 nightly tests** — comprehensive end-to-end tests at 5 AM (~60s), covers all services + smart fixer + escalation, Discord results
+- **88 nightly tests** — comprehensive end-to-end tests at 5 AM (~60s), covers all services + smart fixer + escalation, Discord results
 - **SearXNG** — self-hosted web search for AI agent, Homepage dashboard, Open WebUI
 - **Diagnostic toolkit** — file ops, log reading, permission fixes, library rescans for AI escalation
 - **Unified API** — single FastAPI endpoint aggregating all services (Swagger docs included)
@@ -212,6 +212,19 @@ See [AI Stack](docs/ai-stack.md) for full details.
 - **AI self-healing** — consolidated Homelab Agent with 3-tier repair (1.7b fast tools → 35b smart fixer → Claude Code backstop) auto-fixes containers, torrents, VPN, permissions, imports, configs
 - **Dual-channel Discord alerts** — all watchdogs and bots report to both Discord servers
 - **Zero cloud dependencies** — everything self-hosted (except Cloudflare tunnel for external access)
+
+---
+
+## Open Source Projects
+
+Custom Go services built for this homelab, available as standalone projects:
+
+| Project | Language | Description |
+|---------|----------|-------------|
+| [Librarr](https://github.com/JeremiahM37/librarr) | Go | Book/audiobook/manga search + download, 13 sources, Torznab API, OPDS feed |
+| [Sentinel](https://github.com/JeremiahM37/sentinel) | Go | Download guardian with library verification (Jellyfin/ABS/Kavita/Sonarr/Radarr) |
+| [Gamarr](https://github.com/JeremiahM37/gamarr) | Go | Game/ROM search + download, 24 platforms, 3 sources, 43 e2e tests |
+| [Homelab Blueprint](https://github.com/JeremiahM37/homelab-blueprint) | Docs | This repo — architecture documentation |
 
 ---
 
