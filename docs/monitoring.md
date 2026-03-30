@@ -24,6 +24,13 @@ Multiple layers of monitoring ensure services stay healthy with minimal manual i
                                       └───────────────────────┘
 
 ┌─────────────────────────────────────────────────────┐
+│             SSO / Reverse Proxy Layer                 │
+│  nginx (34 subdomains) ──► Authelia (file-based SSO) │
+│  *.homelab.internal · self-signed wildcard cert       │
+│  dnsmasq for local DNS resolution                    │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
 │               Library Verification                   │
 │  Real API proof — file paths, durations, page counts │
 │  /api/verify/check  ·  /api/verify/check-all         │
@@ -87,6 +94,23 @@ Issue detected
 - Prevents repeating the same fix for recurring issues
 - Fingerprint-based alert deduplication — same alert won't spam Discord
 - Resolved notifications sent when issues clear
+
+---
+
+## SSO / Reverse Proxy (Authelia + nginx)
+
+All browser access to Docker services goes through an **nginx reverse proxy** with **Authelia** single sign-on. Services are accessed via `https://<service>.homelab.internal` instead of direct IP:port.
+
+- **Authelia**: File-based auth, one-factor, session cookie scoped to `.homelab.internal`
+- **nginx**: 34 subdomain server blocks, self-signed wildcard cert (`*.homelab.internal`, 10-year expiry)
+- **dnsmasq**: Resolves `*.homelab.internal` to the Docker host IP
+
+Three auth tiers:
+1. **True SSO** (Sonarr, Radarr, Prowlarr, Bazarr, Grafana, n8n, Paperless) — Authelia auto-login via `Remote-User` header, no service login needed
+2. **Authelia gate** (Homepage, it-tools, Stirling PDF, Tdarr, Pulse, Sentinel) — services have no built-in auth; Authelia is the sole protection
+3. **Direct passthrough** (Jellyfin, qBittorrent, Audiobookshelf, Kavita, etc.) — nginx proxies without `auth_request`; services use their own login pages
+
+Key files (LXC 200): `/opt/docker/nginx-proxy/nginx.conf`, `/opt/docker/authelia/configuration.yml`, `/opt/docker/authelia/users_database.yml`, `/etc/dnsmasq.d/homelab.conf`
 
 ---
 

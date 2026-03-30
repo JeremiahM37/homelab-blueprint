@@ -65,6 +65,13 @@ All services run on a single privileged LXC container (12 cores, 24 GB RAM) usin
 |-----------|------|---------|-------|
 | **searxng** | 8888 | Self-hosted web search | JSON API, powers AI agent + Homepage search |
 
+### SSO / Reverse Proxy
+
+| Container | Port | Purpose | Notes |
+|-----------|------|---------|-------|
+| **nginx-proxy** | 80, 443 | Reverse proxy | 34 subdomains on `*.homelab.internal`, self-signed wildcard cert (10-year) |
+| **authelia** | 9091 | SSO identity provider | File-based auth, one-factor, session cookie for `.homelab.internal` |
+
 ### Infrastructure & Monitoring
 
 | Container | Port | Purpose | Notes |
@@ -131,6 +138,16 @@ Several services use dedicated database containers on the `internal` network:
 ### PUID/PGID
 
 Most containers run as UID/GID 1000. Download directories must be owned by `1000:1000` or you'll get permission errors (especially visible as qBittorrent "error" state).
+
+### SSO Integration
+
+All services are accessible via `https://<service>.homelab.internal` through the nginx reverse proxy. Authentication is handled in three tiers:
+
+- **Tier 1 — True SSO**: Sonarr, Radarr, Prowlarr, Bazarr, Grafana, n8n, Paperless trust the `Remote-User` header from Authelia (no service login needed)
+- **Tier 2 — Authelia gate**: Homepage, it-tools, Stirling PDF, Tdarr, Pulse, Sentinel have no built-in auth; Authelia is the sole protection
+- **Tier 3 — Passthrough**: Jellyfin, qBittorrent, Audiobookshelf, Kavita, Portainer, etc. use their own login; nginx proxies without `auth_request`
+
+API calls from the Homelab API / Agent use direct IP:port (bypassing nginx) — SSO only applies to browser access.
 
 ### Health Checks
 

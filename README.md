@@ -26,7 +26,8 @@ This repo documents the architecture, services, and lessons learned. No credenti
 │  │ Gaming VM  │  │  │ 35+ containers │  │  │ LXC 104  Work Env        │   │
 │  │ 4c/24GB    │  │  │ 12c/24GB       │  │  │ LXC 105  ML Research     │   │
 │  │ GPU pass-  │  │  │                │  │  │ LXC 106  AI Detection    │   │
-│  │ through    │  │  │ + SearXNG      │  │  │                           │   │
+│  │ through    │  │  │ + nginx SSO    │  │  │                           │   │
+│  │            │  │  │ + SearXNG      │  │  │                           │   │
 │  └────────────┘  │  └────────────────┘  │  ├───────────────────────────┤   │
 │                  │                      │  │ Homelab API   :9105       │   │
 │  * Only GPU in   │  DAS: 8TB btrfs      │  │  └─ AI Agent (Jarvis)    │   │
@@ -94,10 +95,13 @@ Internet
         │
         ├── MediaServer node
         │     └── LXC 200 — bridged LAN
+        │           ├── nginx reverse proxy (*.homelab.internal)
+        │           │     └── Authelia SSO (3-tier auth)
         │           ├── gluetun VPN (Mullvad WireGuard)
         │           │     ├── qBittorrent
         │           │     ├── Librarr
         │           │     └── Gamarr
+        │           ├── dnsmasq (local DNS for *.homelab.internal)
         │           └── SearXNG (self-hosted web search)
         │
         └── AIServer node
@@ -179,7 +183,7 @@ See [AI Stack](docs/ai-stack.md) for full details.
 | [Automation](docs/automation.md) | Download Guardian, Homelab Agent, backups, nightly tests, CrowdSec, Terraform, dual-channel alerts |
 | [Monitoring](docs/monitoring.md) | Homelab Agent (7 modules, 3-tier AI repair), n8n watchdog workflows, Homepage dashboard, storage monitoring |
 | [Media Stack](docs/media-stack.md) | Jellyfin, *arr apps, download automation |
-| [Networking](docs/networking.md) | VPN, Cloudflare tunnel, Tailscale mesh |
+| [Networking](docs/networking.md) | VPN, Cloudflare tunnel, Tailscale mesh, nginx + Authelia SSO |
 | [Lessons Learned](docs/lessons-learned.md) | Gotchas, debugging tips, things that broke |
 | [Docker Compose (example)](docker-compose.example.yml) | Sanitized compose file |
 
@@ -206,6 +210,7 @@ See [AI Stack](docs/ai-stack.md) for full details.
 - **Unified API** — single FastAPI endpoint aggregating all services (Swagger docs included)
 - **Document RAG** — vector search over 169+ documents via local embeddings + LLM
 - **Automated backups** — Restic to DAS, 4 nodes, daily, encrypted, deduplicated
+- **SSO reverse proxy** — nginx + Authelia, 34 subdomains on `*.homelab.internal`, 3-tier auth (true SSO / gate / passthrough), self-signed wildcard cert, dnsmasq for LAN + Tailscale split DNS for remote
 - **CrowdSec IPS** — 1400+ malicious IPs blocked at firewall, community threat intel
 - **Terraform IaC** — entire cluster defined as code, importable state
 - **9 n8n workflows** — dual-channel Discord alerts, watchdogs, health checks
