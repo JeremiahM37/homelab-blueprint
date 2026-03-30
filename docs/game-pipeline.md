@@ -14,10 +14,30 @@ Search & Download (LXC 200)          Sync & Install (Gaming VM)
 └──────────┘    └────┬─────┘         └──────┬───────┘    └─────┬─────┘
                      │                      │                  │
               ┌──────▼──────┐        ┌──────▼───────┐   ┌─────▼──────┐
-              │ /games/vault│◀═rsync═│~/Games/vault/ │   │ Steam ROM  │
-              │ /roms/{plat}│        │~/Emulation/   │   │ Import     │
-              └─────────────┘        └──────────────┘   └────────────┘
+              │/games-incom │        │~/Games/vault/ │   │ Steam ROM  │
+              │  → /vault   │◀═rsync═│~/Emulation/   │   │ Import     │
+              └──────┬──────┘        └──────────────┘   └────────────┘
+                     │
+              ┌──────▼──────┐
+              │ Homelab     │  Auto-organize: incoming → vault
+              │ Agent       │  Dead torrent: search Gamarr for alt
+              │ (self-heal) │  Stuck metadata: cancel + retry
+              └─────────────┘
 ```
+
+### Self-Healing Pipeline
+
+The Homelab Agent's **Torrent Doctor** monitors the game download pipeline every 5 minutes:
+
+| Issue | Automatic Fix |
+|-------|--------------|
+| Download completes in `/games-incoming` | Auto-move to `/games/vault` |
+| Torrent stuck on metadata >30 min | Search Gamarr for alternative, cancel + retry |
+| Dead torrent (0 seeds >6h) | Search Gamarr for well-seeded alternative |
+| Gamarr download failed | Retry with different source from search results |
+| All automated fixes fail | Escalate to 35b smart fixer → Claude Code |
+
+Files with spaces and special characters are handled via base64-encoded commands through the SSH chain.
 
 ## Components
 
@@ -37,7 +57,7 @@ Gamarr sends found torrents/magnets to qBittorrent or downloads directly (DDL) f
 
 Downloads torrents through the VPN tunnel. Files land in:
 
-- PC games → `/games/vault/`
+- PC games → `/games-incoming/` (auto-moved to `/games/vault/` by Homelab Agent)
 - ROMs → `/roms/{platform}/`
 
 ### 3. game-sync.sh (Sync to Gaming VM)
