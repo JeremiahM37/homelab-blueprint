@@ -52,7 +52,7 @@ The primary monitoring system. Runs on AIServer (port 9106) and scans the entire
 | **Container Doctor** | Monitors 14 key containers, auto-restarts crashed ones, crash loop guard | Every 5 min |
 | **Source Intelligence** | Checks all 13 Librarr search sources, tracks availability, detects outages | Every 60 min |
 | **Import Watchdog** | Detects stuck downloads and failed imports, auto-retries | Every 5 min |
-| **Torrent Doctor** | qBit health checks, VPN stall detection, orphan routing, dead torrent replacement via Prowlarr, ratio-limit checks | Every 5 min |
+| **Torrent Doctor** | qBit health checks, VPN stall detection, dead torrent replacement (0 seeds >5 min → search Gamarr/Prowlarr for alternative), game auto-organize (incoming → vault), Gamarr stuck/failed job retry, orphan routing, ratio-limit checks | Every 5 min |
 | **System Monitor** | DAS mount verification, disk space with 7-day forecasting, host load/RAM, container resource outliers, Prowlarr indexer auto-retry, Tdarr/Unpackerr/Cloudflared monitoring, n8n workflow checks, download directory permissions | Every 5 min |
 | **Notifications** | Fingerprint-based alert deduplication, resolved notifications, rate limiting, weekly digest | Continuous |
 | **AI Escalation** | 3-tier repair system — Tier 1 (1.7b fast tools) → Tier 2 (35b smart fixer) → Tier 3 (Claude Code) | On failure |
@@ -189,6 +189,24 @@ The Guardian's library verification loop uses these endpoints to confirm downloa
 
 ---
 
+## Web Terminals (ttyd)
+
+7 ttyd instances provide browser-based shell access to all nodes. Available from the Mobile PWA's "Term" tab or directly at `http://YOUR_AISERVER_IP:768x`.
+
+| Port | Target | Description |
+|------|--------|-------------|
+| 7681 | AIServer | Host shell (admin) |
+| 7682 | LXC 104 | Work env — Claude Code, Docker, dev |
+| 7683 | LXC 105 | Research env — PyTorch, ROCm |
+| 7684 | LXC 102 | OpenClaw — Ollama, Open-WebUI |
+| 7685 | LXC 200 | Docker host — 55+ containers |
+| 7686 | MediaServer | Proxmox host, DAS, backups |
+| 7687 | pve | Gaming server, GPU passthrough |
+
+Start all: `/home/admin/web-terminals/start-terminals.sh`
+
+---
+
 ## Homepage Dashboard
 
 ### Sections
@@ -222,7 +240,7 @@ search:
 
 ---
 
-## Nightly Tests (76 tests, 5 AM daily)
+## Nightly Tests (88 tests, 5 AM daily)
 
 Comprehensive end-to-end test suite that validates every service in the homelab is functioning correctly.
 
@@ -230,7 +248,7 @@ Comprehensive end-to-end test suite that validates every service in the homelab 
 - **Location**: `/home/admin/nightly-tests/run_all.sh`
 - **Coverage**: HTTP health checks, API endpoints, SSH connectivity, Docker containers, Proxmox cluster, smart fixer validation, tiered escalation checks, 35b model responsiveness
 - **Notification**: Results posted to Discord via Python JSON builder (avoids newline escaping issues with bash)
-- **Runtime**: ~60 seconds for all 76 tests
+- **Runtime**: ~60 seconds for all 88 tests
 
 ---
 

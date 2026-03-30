@@ -446,7 +446,7 @@ pip install torch --index-url https://rocm.nightlies.amd.com/v2/gfx1151/
 
 ---
 
-## Nightly Tests (76 tests, 5 AM daily)
+## Nightly Tests (88 tests, 5 AM daily)
 
 Comprehensive end-to-end test suite that validates every service in the homelab is functioning correctly.
 
@@ -454,4 +454,4 @@ Comprehensive end-to-end test suite that validates every service in the homelab 
 - **Location**: `/home/admin/nightly-tests/run_all.sh`
 - **Coverage**: HTTP health checks, API endpoints, SSH connectivity, Docker containers, Proxmox cluster, smart fixer validation, tiered escalation checks, 35b model responsiveness
 - **Notification**: Results posted to Discord with pass/fail summary
-- **Runtime**: ~60 seconds for all 76 tests
+- **Runtime**: ~60 seconds for all 88 tests

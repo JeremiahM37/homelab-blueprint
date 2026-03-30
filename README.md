@@ -53,7 +53,7 @@ This repo documents the architecture, services, and lessons learned. No credenti
 │   │    SearXNG (self-hosted web search) ─── Open WebUI + Homepage     │    │
 │   │    Homelab Agent (proactive: 7 modules, 3-tier AI repair,         │    │
 │   │      every 5min, port 9106)                                      │    │
-│   │    Nightly Tests (76 tests at 5 AM, Discord results)             │    │
+│   │    Nightly Tests (88 tests at 5 AM, Discord results)             │    │
 │   └────────────────────────────────────────────────────────────────────┘    │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
