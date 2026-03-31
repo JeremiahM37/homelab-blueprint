@@ -1,0 +1,52 @@
+---
+# Restic backup defaults
+restic_repo_path: "/mnt/storage/backups/homelab"
+restic_backup_hour: 3
+restic_backup_minute: 0
+restic_retention_daily: 7
+restic_retention_weekly: 4
+restic_retention_monthly: 3
+
+# MediaServer hosts the backup repo (via SFTP)
+backup_repo_host: "mediaserver"
+
+# Per-node backup configs
+backup_configs:
+  aiserver:
+    paths:
+      - "/home/admin/"
+      - "/etc/pve/"
+    excludes:
+      - "*.pyc"
+      - "__pycache__"
+      - ".cache"
+      - "node_modules"
+      - "venv"
+    hostname: "aiserver"
+  pve:
+    paths:
+      - "/etc/pve/"
+      - "/root/.ssh/"
+      - "/etc/default/grub"
+      - "/etc/modprobe.d/"
+      - "/etc/modules-load.d/"
+      - "/etc/network/interfaces"
+    excludes: []
+    hostname: "pve"
+  mediaserver:
+    paths:
+      - "/etc/pve/"
+      - "/root/.ssh/"
+    excludes: []
+    hostname: "mediaserver"
+
+# LXC 200 backup is triggered from mediaserver
+lxc200_backup_paths:
+  - "/opt/docker/"
+lxc200_backup_excludes:
+  - "*/media/*"
+  - "*/cache/*"
+  - "*/Cache/*"
+  - "*/logs/*"
+  - "*.log"
+  - "*/transcode/*"

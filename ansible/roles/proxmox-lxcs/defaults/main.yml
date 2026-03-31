@@ -1,0 +1,11 @@
+---
+# LXC defaults — override per-container in group_vars/all.yml lxc_containers dict.
+lxc_template_storage: "local"
+lxc_disk_storage: "local-lvm"
+lxc_network_bridge: "vmbr0"
+lxc_nameserver: ""      # set in inventory if needed
+lxc_searchdomain: ""    # set in inventory if needed
+
+# Container template download
+lxc_template: "debian-12-standard_12.7-1_amd64.tar.zst"
+lxc_template_url: ""    # leave empty to use pveam

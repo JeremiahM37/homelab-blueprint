@@ -1,0 +1,138 @@
+---
+# Homelab Ansible Inventory
+# Copy to inventory.yml and fill in your values.
+# inventory.yml is gitignored — never commit secrets.
+
+all:
+  vars:
+    # --- Timezone ---
+    timezone: "America/Denver"
+
+    # --- Domain ---
+    homelab_domain: "homelab.internal"
+
+    # --- Docker host (LXC 200) ---
+    docker_host_ip: "YOUR_DOCKER_HOST_IP"  # e.g. 192.168.1.222
+    docker_compose_dir: "/opt/docker"
+    media_data_path: "/data/media"
+
+    # --- VPN ---
+    vpn_provider: "mullvad"
+    vpn_type: "wireguard"
+    vault_vpn_private_key: "YOUR_VPN_PRIVATE_KEY"
+    vault_vpn_address: "YOUR_VPN_ADDRESS"
+    vpn_country: "us"
+
+    # --- qBittorrent ---
+    vault_qbit_user: "YOUR_QBIT_USER"
+    vault_qbit_password: "YOUR_QBIT_PASSWORD"
+
+    # --- *arr API Keys ---
+    vault_prowlarr_api_key: "YOUR_PROWLARR_API_KEY"
+    vault_sonarr_api_key: "YOUR_SONARR_API_KEY"
+    vault_radarr_api_key: "YOUR_RADARR_API_KEY"
+    vault_jellyfin_api_key: "YOUR_JELLYFIN_API_KEY"
+    vault_jellyseerr_api_key: "YOUR_JELLYSEERR_API_KEY"
+
+    # --- Librarr ---
+    vault_librarr_user: "YOUR_LIBRARR_USER"
+    vault_librarr_password: "YOUR_LIBRARR_PASSWORD"
+    vault_torznab_api_key: "YOUR_TORZNAB_API_KEY"
+
+    # --- Sentinel ---
+    vault_abs_token: "YOUR_AUDIOBOOKSHELF_TOKEN"
+    vault_kavita_api_key: "YOUR_KAVITA_API_KEY"
+    vault_sentinel_discord_webhook: "YOUR_DISCORD_WEBHOOK_URL"
+
+    # --- Database credentials (shared across services) ---
+    vault_db_user: "YOUR_DB_USER"
+    vault_db_password: "YOUR_DB_PASSWORD"
+    vault_db_root_password: "YOUR_DB_ROOT_PASSWORD"
+
+    # --- Paperless ---
+    vault_paperless_secret: "YOUR_RANDOM_SECRET_KEY"
+
+    # --- Linkwarden ---
+    vault_linkwarden_secret: "YOUR_NEXTAUTH_SECRET"
+
+    # --- n8n ---
+    vault_n8n_user: "YOUR_N8N_USER"
+    vault_n8n_password: "YOUR_N8N_PASSWORD"
+
+    # --- Cloudflare ---
+    vault_cloudflare_tunnel_token: "YOUR_TUNNEL_TOKEN"
+
+    # --- Discord ---
+    vault_discord_bot_token: "YOUR_DISCORD_BOT_TOKEN"
+    vault_discord_webhook_url: "YOUR_DISCORD_WEBHOOK_URL"
+    vault_discord_webhook_url_2: "YOUR_SECOND_DISCORD_WEBHOOK_URL"
+
+    # --- Authelia SSO ---
+    vault_authelia_jwt_secret: "YOUR_JWT_SECRET"
+    vault_authelia_session_secret: "YOUR_SESSION_SECRET"
+    vault_authelia_storage_encryption_key: "YOUR_ENCRYPTION_KEY"
+    vault_authelia_user: "YOUR_SSO_USERNAME"
+    vault_authelia_password_hash: "YOUR_ARGON2_HASHED_PASSWORD"
+    vault_authelia_display_name: "Your Name"
+    vault_authelia_email: "you@example.com"
+
+    # --- Restic Backups ---
+    vault_restic_password: "YOUR_RESTIC_REPO_PASSWORD"
+    restic_repo_path: "/mnt/storage/backups/homelab"
+
+    # --- Ollama ---
+    ollama_models:
+      - "qwen3.5:35b-a3b"
+      - "qwen3:1.7b"
+      - "nomic-embed-text"
+
+    # --- Homelab API ---
+    vault_homelab_api_key: "YOUR_HOMELAB_API_KEY"
+
+    # --- Proxmox ---
+    vault_proxmox_api_token: "YOUR_PROXMOX_API_TOKEN"
+
+    # --- Mealie ---
+    vault_mealie_api_token: "YOUR_MEALIE_TOKEN"
+
+  children:
+    proxmox_nodes:
+      hosts:
+        pve:
+          ansible_host: "YOUR_PVE_IP"           # e.g. 192.168.1.10
+          ansible_user: root
+          node_role: gaming
+          gpu_vendor: nvidia
+          gpu_pci_ids: "10de:1f07,10de:10f9,10de:1ada,10de:1adb"
+        mediaserver:
+          ansible_host: "YOUR_MEDIASERVER_IP"    # e.g. 192.168.1.20
+          ansible_user: root
+          node_role: media
+          das_uuid: "YOUR_DAS_UUID"              # e.g. 7d80ea3f
+          das_mount: "/mnt/storage"
+        aiserver:
+          ansible_host: "YOUR_AISERVER_IP"       # e.g. 192.168.1.30
+          ansible_user: admin
+          ansible_become_password: "YOUR_ADMIN_PASSWORD"
+          node_role: ai
+          gpu_vendor: amd
+          aiserver_admin_user: admin
+
+    docker_hosts:
+      hosts:
+        lxc200:
+          ansible_host: "YOUR_DOCKER_HOST_IP"    # e.g. 192.168.1.222
+          ansible_user: root
+
+    ai_hosts:
+      hosts:
+        lxc102:
+          ansible_host: "YOUR_LXC102_IP"         # e.g. 192.168.1.102
+          ansible_user: root
+
+    dev_hosts:
+      hosts:
+        lxc104:
+          ansible_host: "YOUR_LXC104_IP"         # e.g. 192.168.1.104
+          ansible_user: claude
+          ansible_become_password: "YOUR_LXC104_PASSWORD"

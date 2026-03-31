@@ -1,0 +1,22 @@
+---
+# Docker host defaults (LXC 200)
+docker_compose_dir: "/opt/docker"
+media_data_path: "/data/media"
+docker_puid: 1000
+docker_pgid: 1000
+docker_group_gid: 996
+
+# Directories to create for media storage
+media_directories:
+  - "{{ media_data_path }}/movies"
+  - "{{ media_data_path }}/tv"
+  - "{{ media_data_path }}/music"
+  - "{{ media_data_path }}/books/ebooks"
+  - "{{ media_data_path }}/books/ebooks/incoming"
+  - "{{ media_data_path }}/books/audiobooks"
+  - "{{ media_data_path }}/books/comics"
+  - "{{ media_data_path }}/books/manga"
+  - "{{ media_data_path }}/podcasts"
+  - "{{ media_data_path }}/games/vault"
+  - "{{ media_data_path }}/games/roms"
+  - "{{ media_data_path }}/downloads"

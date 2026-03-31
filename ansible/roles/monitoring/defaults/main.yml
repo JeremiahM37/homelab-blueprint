@@ -1,0 +1,11 @@
+---
+# Monitoring defaults (Loki + Promtail + Grafana datasource)
+loki_config_dir: "/opt/docker/loki"
+promtail_config_dir: "/opt/docker/promtail"
+loki_port: 3100
+loki_retention_days: 30
+promtail_positions_path: "/var/log/promtail-positions.yaml"
+
+# Log sources to scrape
+promtail_docker_log_path: "/var/lib/docker/containers"
+promtail_syslog_path: "/var/log/syslog"

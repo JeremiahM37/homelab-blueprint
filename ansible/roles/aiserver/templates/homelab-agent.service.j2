@@ -1,0 +1,15 @@
+[Unit]
+Description=Homelab Agent (Proactive Autonomous Monitoring)
+After=network.target
+
+[Service]
+Type=simple
+User={{ aiserver_admin_user }}
+WorkingDirectory={{ homelab_agent_dir }}
+ExecStart={{ homelab_agent_dir }}/venv/bin/python main.py
+Restart=always
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,106 @@
+---
+# Common base setup for all Proxmox nodes.
+# Installs packages, configures SSH, sets timezone.
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ timezone }}"
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install common packages
+  ansible.builtin.apt:
+    name: "{{ common_packages }}"
+    state: present
+
+- name: Ensure SSH directory exists
+  ansible.builtin.file:
+    path: /root/.ssh
+    state: directory
+    mode: "0700"
+
+- name: Deploy authorized_keys (if provided)
+  ansible.builtin.copy:
+    content: "{{ ssh_authorized_keys }}"
+    dest: /root/.ssh/authorized_keys
+    mode: "0600"
+  when: ssh_authorized_keys is defined
+
+- name: Harden SSH — disable password auth for root
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PermitRootLogin"
+    line: "PermitRootLogin prohibit-password"
+  notify: Restart sshd
+
+- name: Enable and start sshd
+  ansible.builtin.service:
+    name: sshd
+    state: started
+    enabled: true
+
+- name: Install temp-api dependencies
+  ansible.builtin.apt:
+    name:
+      - python3
+      - lm-sensors
+    state: present
+
+- name: Deploy temp-api script
+  ansible.builtin.copy:
+    dest: /usr/local/bin/temp-api.py
+    mode: "0755"
+    content: |
+      #!/usr/bin/env python3
+      """Tiny HTTP server serving hwmon sensor data as JSON on port {{ temp_api_port }}."""
+      import http.server, json, subprocess, re, os
+      PORT = int(os.environ.get("TEMP_API_PORT", {{ temp_api_port }}))
+      class Handler(http.server.BaseHTTPRequestHandler):
+          def do_GET(self):
+              try:
+                  out = subprocess.check_output(["sensors", "-j"], text=True)
+                  data = json.loads(out)
+              except Exception as e:
+                  data = {"error": str(e)}
+              self.send_response(200)
+              self.send_header("Content-Type", "application/json")
+              self.end_headers()
+              self.wfile.write(json.dumps(data).encode())
+          def log_message(self, *a): pass
+      http.server.HTTPServer(("", PORT), Handler).serve_forever()
+
+- name: Deploy temp-api systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/temp-api.service
+    content: |
+      [Unit]
+      Description=Temperature Sensor API
+      After=network.target
+
+      [Service]
+      ExecStart=/usr/bin/python3 /usr/local/bin/temp-api.py
+      Restart=always
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: Reload systemd
+
+- name: Enable and start temp-api
+  ansible.builtin.service:
+    name: temp-api
+    state: started
+    enabled: true
+
+handlers:
+  - name: Restart sshd
+    ansible.builtin.service:
+      name: sshd
+      state: restarted
+
+  - name: Reload systemd
+    ansible.builtin.systemd:
+      daemon_reload: true

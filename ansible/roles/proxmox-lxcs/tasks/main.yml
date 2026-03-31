@@ -1,0 +1,71 @@
+---
+# Create LXC containers on Proxmox nodes.
+# Only creates containers whose node matches the current host.
+
+- name: Ensure LXC template is available
+  ansible.builtin.command:
+    cmd: pveam download {{ lxc_template_storage }} {{ lxc_template }}
+  args:
+    creates: "/var/lib/vz/template/cache/{{ lxc_template }}"
+  changed_when: false
+  failed_when: false
+
+- name: Create LXC containers for this node
+  ansible.builtin.shell: |
+    set -e
+    VMID={{ item.key }}
+
+    # Skip if container already exists
+    if pct status $VMID >/dev/null 2>&1; then
+      echo "LXC $VMID already exists, skipping"
+      exit 0
+    fi
+
+    pct create $VMID \
+      {{ lxc_template_storage }}:vztmpl/{{ item.value.template | default(lxc_template) }} \
+      --hostname {{ item.value.hostname }} \
+      --cores {{ item.value.cores }} \
+      --memory {{ item.value.memory }} \
+      --rootfs {{ lxc_disk_storage }}:{{ item.value.disk }} \
+      --net0 name=eth0,bridge={{ lxc_network_bridge }},ip={{ item.value.ip }},gw={{ item.value.gateway }} \
+      {% if item.value.privileged | default(false) %}--unprivileged 0{% else %}--unprivileged 1{% endif %} \
+      {% if item.value.features is defined %}--features {{ item.value.features }}{% endif %} \
+      --onboot 1 \
+      --start 0
+
+    echo "Created LXC $VMID ({{ item.value.hostname }})"
+  args:
+    executable: /bin/bash
+  loop: "{{ lxc_containers | dict2items }}"
+  when:
+    - item.value.node == inventory_hostname
+    - item.value.ip | length > 0
+  register: lxc_create_result
+  changed_when: "'Created LXC' in lxc_create_result.stdout | default('')"
+
+- name: Configure mount points for LXC containers
+  ansible.builtin.shell: |
+    pct set {{ item.key }} --{{ mp_item.key }} {{ mp_item.value }}
+  loop: "{{ lxc_containers | dict2items }}"
+  loop_control:
+    label: "{{ item.key }} mount points"
+  vars:
+    mp_items: "{{ item.value.mountpoints | default({}) | dict2items }}"
+  when:
+    - item.value.node == inventory_hostname
+    - item.value.mountpoints is defined
+    - item.value.mountpoints | length > 0
+  with_items: "{{ mp_items }}"
+  failed_when: false
+  changed_when: false
+
+- name: Start LXC containers
+  ansible.builtin.command:
+    cmd: "pct start {{ item.key }}"
+  loop: "{{ lxc_containers | dict2items }}"
+  when:
+    - item.value.node == inventory_hostname
+    - item.value.ip | length > 0
+  register: lxc_start_result
+  changed_when: lxc_start_result.rc == 0
+  failed_when: false

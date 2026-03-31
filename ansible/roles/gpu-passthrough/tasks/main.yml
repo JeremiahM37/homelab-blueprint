@@ -1,0 +1,88 @@
+---
+# GPU passthrough configuration.
+# NVIDIA vfio-pci on pve (for VM 103).
+# AMD iGPU device passthrough on AIServer (for LXCs).
+
+# ============================================================
+# NVIDIA GPU Passthrough (pve node)
+# ============================================================
+
+- name: Configure IOMMU kernel parameters (NVIDIA/Intel)
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
+    line: 'GRUB_CMDLINE_LINUX_DEFAULT="quiet intel_iommu=on iommu=pt"'
+  when: gpu_vendor == "nvidia"
+  register: grub_iommu
+  notify: Update grub and initramfs
+
+- name: Configure vfio-pci IDs
+  ansible.builtin.copy:
+    dest: /etc/modprobe.d/vfio.conf
+    mode: "0644"
+    content: |
+      options vfio-pci ids={{ gpu_pci_ids | default(nvidia_vfio_ids) }}
+  when: gpu_vendor == "nvidia"
+  notify: Update grub and initramfs
+
+- name: Blacklist NVIDIA drivers on host
+  ansible.builtin.copy:
+    dest: /etc/modprobe.d/blacklist-nvidia.conf
+    mode: "0644"
+    content: |
+      blacklist nouveau
+      blacklist nvidia
+      blacklist nvidia_drm
+      blacklist nvidia_modeset
+  when: gpu_vendor == "nvidia"
+  notify: Update grub and initramfs
+
+- name: Load vfio modules at boot
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/vfio.conf
+    mode: "0644"
+    content: |
+      vfio
+      vfio_iommu_type1
+      vfio_pci
+      vfio_virqfd
+  when: gpu_vendor == "nvidia"
+  notify: Update grub and initramfs
+
+# ============================================================
+# AMD iGPU Passthrough (AIServer node)
+# ============================================================
+
+- name: Configure IOMMU kernel parameters (AMD)
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
+    line: 'GRUB_CMDLINE_LINUX_DEFAULT="quiet amd_iommu=on iommu=pt"'
+  when: gpu_vendor == "amd"
+  register: grub_amd
+  notify: Update grub and initramfs
+
+- name: Configure AMD iGPU passthrough for LXC containers
+  ansible.builtin.blockinfile:
+    path: "/etc/pve/lxc/{{ item }}.conf"
+    marker: "# {mark} ANSIBLE MANAGED — GPU PASSTHROUGH"
+    block: |
+      lxc.cgroup2.devices.allow: c 226:* rwm
+      lxc.cgroup2.devices.allow: c 235:* rwm
+      lxc.mount.entry: /dev/dri dev/dri none bind,optional,create=dir
+      lxc.mount.entry: /dev/kfd dev/kfd none bind,optional,create=file
+  loop: "{{ amd_gpu_lxc_ids }}"
+  when:
+    - gpu_vendor == "amd"
+    - amd_gpu_lxc_ids is defined
+  failed_when: false
+
+handlers:
+  - name: Update grub and initramfs
+    ansible.builtin.shell: |
+      update-grub
+      update-initramfs -u -k all
+    args:
+      executable: /bin/bash
+    # NOTE: A reboot is required after this but is NOT automated.
+    # The user should reboot manually after verifying the config.

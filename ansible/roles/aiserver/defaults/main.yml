@@ -1,0 +1,24 @@
+---
+# AIServer host service defaults
+aiserver_admin_user: "admin"
+aiserver_home: "/home/admin"
+
+# Service directories
+homelab_api_dir: "{{ aiserver_home }}/homelab-api"
+homelab_agent_dir: "{{ aiserver_home }}/homelab-agent"
+doc_rag_dir: "{{ aiserver_home }}/doc-rag"
+nightly_tests_dir: "{{ aiserver_home }}/nightly-tests"
+web_terminals_dir: "{{ aiserver_home }}/web-terminals"
+
+# Service ports
+homelab_api_port: 9105
+homelab_agent_port: 9106
+doc_rag_port: 9103
+terraform_status_port: 9104
+
+# Nightly tests
+nightly_tests_hour: 5
+nightly_tests_minute: 0
+
+# Claude Code loop (checks for fix-request.md every 5 hours)
+claude_loop_interval_hours: 5

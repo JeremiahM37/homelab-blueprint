@@ -1,0 +1,88 @@
+---
+# Homelab Blueprint — Main Playbook
+#
+# Full deploy:
+#   ansible-playbook playbook.yml
+#
+# Specific components:
+#   ansible-playbook playbook.yml --tags common
+#   ansible-playbook playbook.yml --tags lxc
+#   ansible-playbook playbook.yml --tags docker
+#   ansible-playbook playbook.yml --tags ai
+#   ansible-playbook playbook.yml --tags sso
+#   ansible-playbook playbook.yml --tags monitoring
+#   ansible-playbook playbook.yml --tags backups
+#   ansible-playbook playbook.yml --tags gpu
+#   ansible-playbook playbook.yml --tags dev
+#   ansible-playbook playbook.yml --tags aiserver
+
+# ── Step 1: Base setup on all Proxmox nodes ──
+- name: Common setup on all Proxmox nodes
+  hosts: proxmox_nodes
+  tags: [common]
+  roles:
+    - common
+
+# ── Step 2: GPU passthrough (pve + AIServer) ──
+- name: GPU passthrough configuration
+  hosts: proxmox_nodes
+  tags: [gpu]
+  roles:
+    - gpu-passthrough
+  when: gpu_vendor is defined
+
+# ── Step 3: Create LXC containers ──
+- name: Create LXC containers on Proxmox nodes
+  hosts: proxmox_nodes
+  tags: [lxc]
+  roles:
+    - proxmox-lxcs
+
+# ── Step 4: Docker host setup (LXC 200) ──
+- name: Docker host setup
+  hosts: docker_hosts
+  tags: [docker]
+  roles:
+    - docker-host
+
+# ── Step 5: SSO reverse proxy (LXC 200) ──
+- name: Authelia + nginx SSO
+  hosts: docker_hosts
+  tags: [sso]
+  roles:
+    - sso
+
+# ── Step 6: Monitoring stack (LXC 200) ──
+- name: Loki + Promtail + Grafana monitoring
+  hosts: docker_hosts
+  tags: [monitoring]
+  roles:
+    - monitoring
+
+# ── Step 7: Ollama + Open-WebUI (LXC 102) ──
+- name: Ollama and Open-WebUI setup
+  hosts: ai_hosts
+  tags: [ai]
+  roles:
+    - ollama
+
+# ── Step 8: AIServer host services ──
+- name: AIServer host services
+  hosts: aiserver
+  tags: [aiserver]
+  roles:
+    - aiserver
+
+# ── Step 9: Backup configuration ──
+- name: Restic backup setup
+  hosts: proxmox_nodes
+  tags: [backups]
+  roles:
+    - backups
+
+# ── Step 10: Dev environment (LXC 104) ──
+- name: Development environment setup
+  hosts: dev_hosts
+  tags: [dev]
+  roles:
+    - dev-environment

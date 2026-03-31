@@ -1,0 +1,90 @@
+---
+# Loki + Promtail centralized logging + Grafana datasource.
+# Runs as Docker containers alongside the main compose stack.
+
+- name: Create Loki config directory
+  ansible.builtin.file:
+    path: "{{ loki_config_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Create Promtail config directory
+  ansible.builtin.file:
+    path: "{{ promtail_config_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Deploy Loki configuration
+  ansible.builtin.template:
+    src: loki-config.yml.j2
+    dest: "{{ loki_config_dir }}/loki-config.yml"
+    mode: "0644"
+
+- name: Deploy Promtail configuration
+  ansible.builtin.template:
+    src: promtail-config.yml.j2
+    dest: "{{ promtail_config_dir }}/promtail-config.yml"
+    mode: "0644"
+
+- name: Add Loki and Promtail to Docker Compose (if not already present)
+  ansible.builtin.blockinfile:
+    path: "{{ docker_compose_dir }}/docker-compose.yml"
+    marker: "# {mark} ANSIBLE MANAGED — MONITORING"
+    block: |
+
+      # --- Centralized Logging (Loki + Promtail) ---
+        loki:
+          image: grafana/loki:latest
+          container_name: loki
+          volumes:
+            - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+            - ./loki/data:/loki
+          ports:
+            - "{{ loki_port }}:3100"
+          command: -config.file=/etc/loki/local-config.yaml
+          networks:
+            - internal
+          restart: unless-stopped
+
+        promtail:
+          image: grafana/promtail:latest
+          container_name: promtail
+          volumes:
+            - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+            - /var/lib/docker/containers:/var/lib/docker/containers:ro
+            - /var/log:/var/log:ro
+          command: -config.file=/etc/promtail/config.yml
+          networks:
+            - internal
+          restart: unless-stopped
+    insertbefore: "^$"
+  failed_when: false
+
+- name: Configure Grafana Loki datasource
+  ansible.builtin.copy:
+    dest: "{{ docker_compose_dir }}/grafana/provisioning/datasources/loki.yml"
+    mode: "0644"
+    content: |
+      apiVersion: 1
+      datasources:
+        - name: Loki
+          type: loki
+          access: proxy
+          url: http://loki:3100
+          isDefault: false
+  register: grafana_ds
+
+- name: Start monitoring containers
+  ansible.builtin.shell: |
+    cd {{ docker_compose_dir }}
+    docker compose up -d loki promtail
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Create Grafana provisioning directory
+  ansible.builtin.file:
+    path: "{{ docker_compose_dir }}/grafana/provisioning/datasources"
+    state: directory
+    mode: "0755"
+    recurse: true

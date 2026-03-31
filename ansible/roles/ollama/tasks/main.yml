@@ -1,0 +1,129 @@
+---
+# Ollama + Open-WebUI setup for LXC 102.
+# Installs Ollama, pulls models, installs Open-WebUI.
+
+- name: Install prerequisites
+  ansible.builtin.apt:
+    name:
+      - curl
+      - python3
+      - python3-pip
+      - python3-venv
+    state: present
+    update_cache: true
+
+# --- Ollama ---
+- name: Check if Ollama is installed
+  ansible.builtin.command: which ollama
+  register: ollama_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Ollama
+  ansible.builtin.shell: |
+    curl -fsSL https://ollama.ai/install.sh | sh
+  when: ollama_check.rc != 0
+
+- name: Configure Ollama systemd override
+  ansible.builtin.file:
+    path: /etc/systemd/system/ollama.service.d
+    state: directory
+    mode: "0755"
+
+- name: Set Ollama environment variables
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/ollama.service.d/override.conf
+    mode: "0644"
+    content: |
+      [Service]
+      Environment="OLLAMA_HOST=0.0.0.0:{{ ollama_port }}"
+      Environment="OLLAMA_KEEP_ALIVE={{ ollama_keep_alive }}"
+  notify: Restart Ollama
+
+- name: Enable and start Ollama
+  ansible.builtin.service:
+    name: ollama
+    state: started
+    enabled: true
+
+- name: Wait for Ollama to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:{{ ollama_port }}/api/tags"
+    method: GET
+    status_code: 200
+  register: ollama_ready
+  until: ollama_ready.status == 200
+  retries: 30
+  delay: 2
+
+- name: Pull Ollama models
+  ansible.builtin.command:
+    cmd: "ollama pull {{ item }}"
+  loop: "{{ ollama_models }}"
+  register: model_pull
+  changed_when: "'pulling' in model_pull.stdout | default('')"
+  # Models can take a long time to download
+  async: 3600
+  poll: 30
+
+# --- Open-WebUI ---
+- name: Create Open-WebUI data directory
+  ansible.builtin.file:
+    path: "{{ open_webui_data_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Create Open-WebUI venv
+  ansible.builtin.command:
+    cmd: python3 -m venv /opt/open-webui/venv
+    creates: /opt/open-webui/venv/bin/python
+
+- name: Install Open-WebUI via pip
+  ansible.builtin.command:
+    cmd: /opt/open-webui/venv/bin/pip install open-webui
+  register: pip_result
+  changed_when: "'Successfully installed' in pip_result.stdout | default('')"
+
+- name: Deploy Open-WebUI systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/open-webui.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Open-WebUI
+      After=network.target ollama.service
+
+      [Service]
+      Type=simple
+      ExecStart=/opt/open-webui/venv/bin/open-webui serve --host 0.0.0.0 --port {{ open_webui_port }}
+      Environment="DATA_DIR={{ open_webui_data_dir }}"
+      Environment="OLLAMA_BASE_URL=http://localhost:{{ ollama_port }}"
+      Restart=always
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+  notify:
+    - Reload systemd
+    - Restart Open-WebUI
+
+- name: Enable and start Open-WebUI
+  ansible.builtin.service:
+    name: open-webui
+    state: started
+    enabled: true
+
+handlers:
+  - name: Reload systemd
+    ansible.builtin.systemd:
+      daemon_reload: true
+
+  - name: Restart Ollama
+    ansible.builtin.service:
+      name: ollama
+      state: restarted
+
+  - name: Restart Open-WebUI
+    ansible.builtin.service:
+      name: open-webui
+      state: restarted

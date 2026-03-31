@@ -1,0 +1,245 @@
+---
+# AIServer host services setup.
+# Deploys homelab-api, homelab-agent, doc-rag, nightly tests,
+# web terminals, and the Claude Code loop.
+
+- name: Install Python and pip
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-pip
+      - python3-venv
+    state: present
+    update_cache: true
+
+- name: Install ttyd for web terminals
+  ansible.builtin.apt:
+    name: ttyd
+    state: present
+  failed_when: false
+
+- name: Install ttyd from GitHub release if not in apt
+  ansible.builtin.shell: |
+    if ! command -v ttyd >/dev/null 2>&1; then
+      curl -sL https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.x86_64 -o /usr/local/bin/ttyd
+      chmod +x /usr/local/bin/ttyd
+    fi
+  args:
+    creates: /usr/local/bin/ttyd
+
+# --- Homelab API ---
+- name: Create homelab-api directory
+  ansible.builtin.file:
+    path: "{{ homelab_api_dir }}"
+    state: directory
+    owner: "{{ aiserver_admin_user }}"
+    mode: "0755"
+
+- name: Deploy homelab-api systemd service
+  ansible.builtin.template:
+    src: homelab-api.service.j2
+    dest: /etc/systemd/system/homelab-api.service
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Enable homelab-api service
+  ansible.builtin.service:
+    name: homelab-api
+    enabled: true
+  failed_when: false
+
+# --- Homelab Agent ---
+- name: Create homelab-agent directory
+  ansible.builtin.file:
+    path: "{{ homelab_agent_dir }}"
+    state: directory
+    owner: "{{ aiserver_admin_user }}"
+    mode: "0755"
+
+- name: Deploy homelab-agent systemd service
+  ansible.builtin.template:
+    src: homelab-agent.service.j2
+    dest: /etc/systemd/system/homelab-agent.service
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Enable homelab-agent service
+  ansible.builtin.service:
+    name: homelab-agent
+    enabled: true
+  failed_when: false
+
+# --- Document RAG ---
+- name: Create doc-rag directory
+  ansible.builtin.file:
+    path: "{{ doc_rag_dir }}"
+    state: directory
+    owner: "{{ aiserver_admin_user }}"
+    mode: "0755"
+
+- name: Deploy doc-rag systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/doc-rag.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Document RAG Service
+      After=network.target
+
+      [Service]
+      Type=simple
+      User={{ aiserver_admin_user }}
+      WorkingDirectory={{ doc_rag_dir }}
+      ExecStart={{ doc_rag_dir }}/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port {{ doc_rag_port }}
+      Restart=always
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: Reload systemd
+
+- name: Enable doc-rag service
+  ansible.builtin.service:
+    name: doc-rag
+    enabled: true
+  failed_when: false
+
+# --- Nightly Tests ---
+- name: Create nightly-tests directory
+  ansible.builtin.file:
+    path: "{{ nightly_tests_dir }}"
+    state: directory
+    owner: "{{ aiserver_admin_user }}"
+    mode: "0755"
+
+- name: Deploy nightly-tests timer
+  ansible.builtin.template:
+    src: nightly-tests.timer.j2
+    dest: /etc/systemd/system/nightly-tests.timer
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Deploy nightly-tests service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/nightly-tests.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Nightly Homelab Tests
+      After=network.target
+
+      [Service]
+      Type=oneshot
+      User={{ aiserver_admin_user }}
+      WorkingDirectory={{ nightly_tests_dir }}
+      ExecStart={{ nightly_tests_dir }}/run_all.sh
+  notify: Reload systemd
+
+- name: Enable nightly-tests timer
+  ansible.builtin.service:
+    name: nightly-tests.timer
+    enabled: true
+    state: started
+  failed_when: false
+
+# --- Morning Briefing ---
+- name: Deploy morning-briefing timer
+  ansible.builtin.template:
+    src: morning-briefing.timer.j2
+    dest: /etc/systemd/system/morning-briefing.timer
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Deploy morning-briefing service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/morning-briefing.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Morning Briefing
+      After=network.target
+
+      [Service]
+      Type=oneshot
+      User={{ aiserver_admin_user }}
+      WorkingDirectory={{ aiserver_home }}
+      ExecStart={{ aiserver_home }}/morning-briefing/send_briefing.sh
+  notify: Reload systemd
+
+- name: Enable morning-briefing timer
+  ansible.builtin.service:
+    name: morning-briefing.timer
+    enabled: true
+    state: started
+  failed_when: false
+
+# --- Claude Code Loop (Tier 3 AI repair) ---
+- name: Deploy claude-loop systemd service
+  ansible.builtin.template:
+    src: claude-loop.service.j2
+    dest: /etc/systemd/system/claude-loop.service
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Deploy claude-loop timer
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/claude-loop.timer
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Claude Code Loop Timer (Tier 3 AI Repair)
+
+      [Timer]
+      OnCalendar=*-*-* 0/{{ claude_loop_interval_hours }}:00:00
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+  notify: Reload systemd
+
+- name: Enable claude-loop timer
+  ansible.builtin.service:
+    name: claude-loop.timer
+    enabled: true
+    state: started
+  failed_when: false
+
+# --- Web Terminals ---
+- name: Create web-terminals directory
+  ansible.builtin.file:
+    path: "{{ web_terminals_dir }}"
+    state: directory
+    owner: "{{ aiserver_admin_user }}"
+    mode: "0755"
+
+- name: Deploy ttyd systemd services for web terminals
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/ttyd-{{ item.port }}.service"
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Web Terminal ({{ item.description }}) on port {{ item.port }}
+      After=network.target
+
+      [Service]
+      Type=simple
+      ExecStart=/usr/local/bin/ttyd -p {{ item.port }} -W ssh {{ item.target }}
+      Restart=always
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+  loop: "{{ ttyd_instances }}"
+  notify: Reload systemd
+
+- name: Enable ttyd web terminal services
+  ansible.builtin.service:
+    name: "ttyd-{{ item.port }}"
+    enabled: true
+  loop: "{{ ttyd_instances }}"
+  failed_when: false
+
+handlers:
+  - name: Reload systemd
+    ansible.builtin.systemd:
+      daemon_reload: true

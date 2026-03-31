@@ -1,0 +1,9 @@
+[Unit]
+Description=Nightly Homelab Tests Timer
+
+[Timer]
+OnCalendar=*-*-* {{ nightly_tests_hour }}:{{ '%02d' | format(nightly_tests_minute) }}:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

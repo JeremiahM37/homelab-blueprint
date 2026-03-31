@@ -1,0 +1,142 @@
+---
+# Development environment setup for LXC 104 (work-env).
+# Installs Claude Code, Docker, Node.js, Python, Zellij.
+
+- name: Install base development packages
+  ansible.builtin.apt:
+    name:
+      - git
+      - curl
+      - wget
+      - vim
+      - htop
+      - jq
+      - unzip
+      - build-essential
+      - python3
+      - python3-pip
+      - python3-venv
+      - sudo
+      - ca-certificates
+      - gnupg
+      - lsb-release
+      - openssh-server
+    state: present
+    update_cache: true
+
+# --- Docker ---
+- name: Add Docker GPG key
+  ansible.builtin.shell: |
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+  args:
+    creates: /etc/apt/keyrings/docker.asc
+
+- name: Add Docker repository
+  ansible.builtin.shell: |
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(lsb_release -cs) stable" \
+      > /etc/apt/sources.list.d/docker.list
+  args:
+    creates: /etc/apt/sources.list.d/docker.list
+
+- name: Install Docker
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: true
+
+- name: Add dev user to docker group
+  ansible.builtin.user:
+    name: "{{ dev_user }}"
+    groups: docker
+    append: true
+
+- name: Enable Docker
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+
+# --- Node.js via nvm ---
+- name: Install nvm for dev user
+  ansible.builtin.shell: |
+    if [ -d {{ dev_home }}/.nvm ]; then
+      echo "nvm already installed"
+      exit 0
+    fi
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+  become: true
+  become_user: "{{ dev_user }}"
+  args:
+    executable: /bin/bash
+    creates: "{{ dev_home }}/.nvm/nvm.sh"
+
+- name: Install Node.js via nvm
+  ansible.builtin.shell: |
+    source {{ dev_home }}/.nvm/nvm.sh
+    if nvm ls {{ node_version }} >/dev/null 2>&1; then
+      echo "Node {{ node_version }} already installed"
+    else
+      nvm install {{ node_version }}
+      nvm alias default {{ node_version }}
+    fi
+  become: true
+  become_user: "{{ dev_user }}"
+  args:
+    executable: /bin/bash
+  register: node_install
+  changed_when: "'already installed' not in node_install.stdout"
+
+# --- Zellij ---
+- name: Install Zellij
+  ansible.builtin.shell: |
+    if [ -f /usr/local/bin/zellij ]; then
+      echo "Zellij already installed"
+      exit 0
+    fi
+    curl -sL "https://github.com/zellij-org/zellij/releases/download/v{{ zellij_version }}/zellij-x86_64-unknown-linux-musl.tar.gz" | tar xz -C /usr/local/bin/
+    chmod +x /usr/local/bin/zellij
+    echo "Installed Zellij {{ zellij_version }}"
+  args:
+    creates: /usr/local/bin/zellij
+  register: zellij_install
+  changed_when: "'Installed' in zellij_install.stdout | default('')"
+
+# --- Claude Code ---
+- name: Install Claude Code via npm
+  ansible.builtin.shell: |
+    source {{ dev_home }}/.nvm/nvm.sh
+    if command -v claude >/dev/null 2>&1; then
+      echo "Claude Code already installed"
+    else
+      npm install -g @anthropic-ai/claude-code
+      echo "Installed Claude Code"
+    fi
+  become: true
+  become_user: "{{ dev_user }}"
+  args:
+    executable: /bin/bash
+  register: claude_install
+  changed_when: "'Installed' in claude_install.stdout | default('')"
+
+# --- Passwordless sudo ---
+- name: Configure passwordless sudo for dev user
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/{{ dev_user }}"
+    mode: "0440"
+    content: |
+      {{ dev_user }} ALL=(ALL) NOPASSWD:ALL
+    validate: "visudo -cf %s"
+
+# --- SSH ---
+- name: Enable and start SSH
+  ansible.builtin.service:
+    name: sshd
+    state: started
+    enabled: true

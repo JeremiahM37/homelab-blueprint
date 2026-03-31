@@ -1,0 +1,7 @@
+---
+# Dev environment defaults (LXC 104 — work-env)
+dev_user: "claude"
+dev_home: "/home/claude"
+node_version: "20"
+zellij_version: "0.43.1"
+python_version: "3.11"

@@ -1,0 +1,16 @@
+---
+# Ollama + Open-WebUI defaults (LXC 102)
+ollama_port: 11434
+ollama_keep_alive: "2m"
+ollama_models:
+  - "qwen3.5:35b-a3b"
+  - "qwen3:1.7b"
+  - "nomic-embed-text"
+
+open_webui_port: 8080
+open_webui_data_dir: "/var/lib/open-webui"
+
+# AMD iGPU passthrough devices (configured on the Proxmox host, not inside LXC)
+amd_gpu_devices:
+  - "/dev/dri"
+  - "/dev/kfd"

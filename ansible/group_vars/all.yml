@@ -1,0 +1,199 @@
+---
+# Default variables for all hosts.
+# Secrets go in inventory.yml (per-host) — this file has no sensitive values.
+
+# --- General ---
+timezone: "America/Denver"
+homelab_domain: "homelab.internal"
+
+# --- Common packages ---
+common_packages:
+  - curl
+  - wget
+  - htop
+  - vim
+  - git
+  - jq
+  - unzip
+  - rsync
+  - net-tools
+  - dnsutils
+  - sudo
+  - ca-certificates
+  - gnupg
+  - lsb-release
+  - python3
+  - python3-pip
+
+# --- Docker ---
+docker_compose_dir: "/opt/docker"
+media_data_path: "/data/media"
+docker_puid: 1000
+docker_pgid: 1000
+
+# --- Service ports ---
+ports:
+  gluetun_control: 8001
+  qbittorrent: 8080
+  librarr: 5050
+  gamarr: 5057
+  prowlarr: 9696
+  sonarr: 8989
+  radarr: 7878
+  bazarr: 6767
+  jellyfin: 8096
+  jellyseerr: 5055
+  tdarr: 8265
+  audiobookshelf: 13378
+  calibre_web: 8083
+  kavita: 5005
+  shelfarr: 5056
+  sentinel: 9200
+  gamevault: 8087
+  romm: 8086
+  paperless: 8000
+  mealie: 9925
+  homebox: 7745
+  linkwarden: 3050
+  changedetection: 5100
+  stirling_pdf: 8084
+  it_tools: 8085
+  searxng: 8888
+  homepage: 3000
+  uptime_kuma: 3001
+  n8n: 5678
+  portainer: 9000
+  grafana: 3060
+  pulse: 7655
+  discord_bot: 3003
+  crowdsec_api: 8081
+  authelia: 9091
+  nginx_https: 443
+
+# --- LXC container specs ---
+lxc_containers:
+  200:
+    hostname: "docker-server"
+    node: "mediaserver"
+    cores: 12
+    memory: 24576  # MB
+    disk: "100G"
+    ip: "{{ docker_host_ip }}/24"
+    gateway: ""    # fill in inventory
+    template: "debian-12-standard_12.7-1_amd64.tar.zst"
+    privileged: true
+    features: "nesting=1"
+    mountpoints:
+      mp0: "/mnt/storage/media,mp=/data/media"
+  101:
+    hostname: "project-env"
+    node: "aiserver"
+    cores: 4
+    memory: 4096
+    disk: "30G"
+    ip: ""         # fill in inventory
+    gateway: ""
+    template: "debian-12-standard_12.7-1_amd64.tar.zst"
+    privileged: false
+    features: "nesting=1"
+  102:
+    hostname: "openclaw"
+    node: "aiserver"
+    cores: 16
+    memory: 28672
+    disk: "100G"
+    ip: ""
+    gateway: ""
+    template: "debian-12-standard_12.7-1_amd64.tar.zst"
+    privileged: false
+    features: "nesting=1"
+  104:
+    hostname: "work-env"
+    node: "aiserver"
+    cores: 4
+    memory: 4096
+    disk: "16G"
+    ip: ""
+    gateway: ""
+    template: "debian-12-standard_12.7-1_amd64.tar.zst"
+    privileged: false
+    features: "nesting=1"
+  105:
+    hostname: "research-env"
+    node: "aiserver"
+    cores: 16
+    memory: 16384
+    disk: "50G"
+    ip: ""
+    gateway: ""
+    template: "debian-12-standard_12.7-1_amd64.tar.zst"
+    privileged: false
+    features: "nesting=1"
+  106:
+    hostname: "ai-detector"
+    node: "aiserver"
+    cores: 8
+    memory: 12288
+    disk: "50G"
+    ip: ""
+    gateway: ""
+    template: "debian-12-standard_12.7-1_amd64.tar.zst"
+    privileged: false
+    features: "nesting=1"
+
+# --- Ollama ---
+ollama_host: "lxc102"
+ollama_port: 11434
+ollama_keep_alive: "2m"
+ollama_models:
+  - "qwen3.5:35b-a3b"
+  - "qwen3:1.7b"
+  - "nomic-embed-text"
+open_webui_port: 8080
+
+# --- Backups ---
+restic_repo_path: "/mnt/storage/backups/homelab"
+restic_retention_daily: 7
+restic_retention_weekly: 4
+restic_retention_monthly: 3
+restic_backup_hour: 3
+restic_backup_minute: 0
+
+# --- Monitoring ---
+loki_retention_days: 30
+promtail_positions_path: "/var/log/promtail-positions.yaml"
+
+# --- SSO ---
+authelia_port: 9091
+authelia_session_expiration: "12h"
+authelia_session_inactivity: "2h"
+
+# --- AIServer host services ---
+homelab_api_port: 9105
+homelab_agent_port: 9106
+doc_rag_port: 9103
+terraform_status_port: 9104
+temp_api_port: 9101
+
+# --- GPU passthrough ---
+# NVIDIA (pve — VM 103)
+nvidia_vfio_ids: "10de:1f07,10de:10f9,10de:1ada,10de:1adb"
+
+# AMD (AIServer — shared across LXCs 102, 105, 106)
+amd_gpu_devices:
+  - "/dev/dri"
+  - "/dev/kfd"
+
+# --- Web terminals ---
+ttyd_instances:
+  - { port: 7681, target: "aiserver", description: "AIServer host" }
+  - { port: 7682, target: "lxc104", description: "Work env" }
+  - { port: 7683, target: "lxc105", description: "Research env" }
+  - { port: 7684, target: "lxc102", description: "OpenClaw" }
+  - { port: 7685, target: "lxc200", description: "Docker host" }
+  - { port: 7686, target: "mediaserver", description: "MediaServer" }
+  - { port: 7687, target: "pve", description: "pve Gaming" }
+
+# --- Nightly tests ---
+nightly_tests_hour: 5
+nightly_tests_minute: 0

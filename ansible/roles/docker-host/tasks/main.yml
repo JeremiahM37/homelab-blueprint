@@ -1,0 +1,146 @@
+---
+# Docker host setup for LXC 200.
+# Installs Docker, deploys compose file, creates .env, starts services.
+
+- name: Install Docker prerequisites
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - python3-pip
+    state: present
+    update_cache: true
+
+- name: Add Docker GPG key
+  ansible.builtin.shell: |
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+  args:
+    creates: /etc/apt/keyrings/docker.asc
+
+- name: Add Docker repository
+  ansible.builtin.shell: |
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(lsb_release -cs) stable" \
+      > /etc/apt/sources.list.d/docker.list
+  args:
+    creates: /etc/apt/sources.list.d/docker.list
+
+- name: Install Docker Engine
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: true
+
+- name: Enable and start Docker
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Create Docker compose directory
+  ansible.builtin.file:
+    path: "{{ docker_compose_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Create media directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ docker_puid }}"
+    group: "{{ docker_pgid }}"
+    mode: "0775"
+  loop: "{{ media_directories }}"
+
+- name: Copy docker-compose.yml from repo example
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../docker-compose.example.yml"
+    dest: "{{ docker_compose_dir }}/docker-compose.yml"
+    mode: "0644"
+    backup: true
+
+- name: Generate .env file for Docker Compose
+  ansible.builtin.template:
+    src: docker-env.j2
+    dest: "{{ docker_compose_dir }}/.env"
+    mode: "0600"
+    backup: true
+
+- name: Create service config directories
+  ansible.builtin.file:
+    path: "{{ docker_compose_dir }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - qbittorrent
+    - prowlarr
+    - sonarr
+    - radarr
+    - bazarr
+    - jellyseerr
+    - jellyfin
+    - tdarr/server
+    - tdarr/configs
+    - tdarr/logs
+    - audiobookshelf
+    - calibre-web
+    - kavita
+    - shelfarr
+    - librarr-go/data
+    - sentinel/data
+    - gamarr
+    - gamevault-db
+    - romm/resources
+    - romm/redis
+    - romm-db
+    - paperless/data
+    - paperless/media
+    - paperless/consume
+    - mealie
+    - homebox
+    - linkwarden
+    - linkwarden-db
+    - changedetection
+    - stirling-pdf
+    - searxng
+    - homepage
+    - uptime-kuma
+    - n8n
+    - portainer
+    - grafana
+    - prometheus
+    - crowdsec
+    - loki
+    - nginx-proxy/certs
+
+- name: Set ownership for qBit download directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ docker_puid }}"
+    group: "{{ docker_pgid }}"
+    mode: "0775"
+    recurse: false
+  loop:
+    - "{{ media_data_path }}/books/ebooks/incoming"
+    - "{{ media_data_path }}/books/audiobooks"
+    - "{{ media_data_path }}/downloads"
+
+- name: Pull and start Docker Compose services
+  ansible.builtin.shell: |
+    cd {{ docker_compose_dir }}
+    docker compose pull --ignore-pull-failures
+    docker compose up -d
+  args:
+    executable: /bin/bash
+  register: compose_result
+  changed_when: "'Creating' in compose_result.stdout or 'Started' in compose_result.stdout"

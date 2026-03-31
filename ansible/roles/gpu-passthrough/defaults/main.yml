@@ -1,0 +1,10 @@
+---
+# GPU passthrough defaults
+# NVIDIA (pve — VM 103)
+nvidia_vfio_ids: "10de:1f07,10de:10f9,10de:1ada,10de:1adb"
+
+# AMD (AIServer — shared iGPU for LXCs 102, 105, 106)
+amd_gpu_lxc_ids:
+  - 102
+  - 105
+  - 106

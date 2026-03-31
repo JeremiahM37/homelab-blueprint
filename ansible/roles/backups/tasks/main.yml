@@ -1,0 +1,132 @@
+---
+# Restic backup setup — installs restic, deploys backup scripts and timers.
+
+- name: Install restic
+  ansible.builtin.apt:
+    name: restic
+    state: present
+    update_cache: true
+
+- name: Initialize restic repo (on MediaServer only)
+  ansible.builtin.shell: |
+    if [ -d {{ restic_repo_path }} ] && restic -r {{ restic_repo_path }} cat config >/dev/null 2>&1; then
+      echo "Repo already initialized"
+    else
+      mkdir -p {{ restic_repo_path }}
+      restic init -r {{ restic_repo_path }}
+      echo "Initialized new repo"
+    fi
+  environment:
+    RESTIC_PASSWORD: "{{ vault_restic_password }}"
+  when: inventory_hostname == 'mediaserver'
+  register: repo_init
+  changed_when: "'Initialized' in repo_init.stdout | default('')"
+
+- name: Deploy backup script
+  ansible.builtin.template:
+    src: backup-script.sh.j2
+    dest: "/usr/local/bin/backup-{{ inventory_hostname }}.sh"
+    mode: "0700"
+  when: backup_configs[inventory_hostname] is defined
+
+- name: Deploy backup systemd service
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/backup-{{ inventory_hostname }}.service"
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Restic Backup ({{ inventory_hostname }})
+      After=network.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/backup-{{ inventory_hostname }}.sh
+  when: backup_configs[inventory_hostname] is defined
+  notify: Reload systemd
+
+- name: Deploy backup timer
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/backup-{{ inventory_hostname }}.timer"
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Daily Restic Backup Timer ({{ inventory_hostname }})
+
+      [Timer]
+      OnCalendar=*-*-* {{ restic_backup_hour }}:{{ '%02d' | format(restic_backup_minute) }}:00
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+  when: backup_configs[inventory_hostname] is defined
+  notify: Reload systemd
+
+- name: Enable backup timer
+  ansible.builtin.service:
+    name: "backup-{{ inventory_hostname }}.timer"
+    enabled: true
+    state: started
+  when: backup_configs[inventory_hostname] is defined
+  failed_when: false
+
+# --- Backup status API (MediaServer only) ---
+- name: Deploy backup-status-api on MediaServer
+  ansible.builtin.copy:
+    dest: /usr/local/bin/backup-status-api.py
+    mode: "0755"
+    content: |
+      #!/usr/bin/env python3
+      """Serves backup status as JSON on port 9102."""
+      import http.server, json, subprocess, os
+      REPO = "{{ restic_repo_path }}"
+      PW = os.environ.get("RESTIC_PASSWORD", "")
+      class Handler(http.server.BaseHTTPRequestHandler):
+          def do_GET(self):
+              try:
+                  out = subprocess.check_output(
+                      ["restic", "-r", REPO, "snapshots", "--json", "--latest", "3"],
+                      env={**os.environ, "RESTIC_PASSWORD": PW}, text=True, timeout=30
+                  )
+                  data = json.loads(out)
+              except Exception as e:
+                  data = {"error": str(e)}
+              self.send_response(200)
+              self.send_header("Content-Type", "application/json")
+              self.end_headers()
+              self.wfile.write(json.dumps(data).encode())
+          def log_message(self, *a): pass
+      http.server.HTTPServer(("", 9102), Handler).serve_forever()
+  when: inventory_hostname == 'mediaserver'
+
+- name: Deploy backup-status-api systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/backup-status-api.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Backup Status API
+      After=network.target
+
+      [Service]
+      ExecStart=/usr/bin/python3 /usr/local/bin/backup-status-api.py
+      Environment=RESTIC_PASSWORD={{ vault_restic_password }}
+      Restart=always
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+  when: inventory_hostname == 'mediaserver'
+  notify: Reload systemd
+
+- name: Enable backup-status-api
+  ansible.builtin.service:
+    name: backup-status-api
+    state: started
+    enabled: true
+  when: inventory_hostname == 'mediaserver'
+  failed_when: false
+
+handlers:
+  - name: Reload systemd
+    ansible.builtin.systemd:
+      daemon_reload: true

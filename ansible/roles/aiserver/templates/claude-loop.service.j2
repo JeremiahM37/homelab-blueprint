@@ -1,0 +1,10 @@
+[Unit]
+Description=Claude Code Loop (Tier 3 AI Repair)
+After=network.target
+
+[Service]
+Type=oneshot
+User={{ aiserver_admin_user }}
+WorkingDirectory={{ aiserver_home }}
+ExecStart=/bin/bash -c 'if [ -f {{ homelab_agent_dir }}/fix-request.md ]; then claude --print "$(cat {{ homelab_agent_dir }}/fix-request.md)" && rm -f {{ homelab_agent_dir }}/fix-request.md; fi'
+Environment=HOME={{ aiserver_home }}

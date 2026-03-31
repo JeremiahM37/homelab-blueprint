@@ -17,3 +17,7 @@
 Thumbs.db
 CLAUDE.md
 terraform.tfvars
+
+# Ansible
+ansible/inventory.yml
+ansible/*.retry

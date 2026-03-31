@@ -1,0 +1,15 @@
+[Unit]
+Description=Homelab Unified API
+After=network.target
+
+[Service]
+Type=simple
+User={{ aiserver_admin_user }}
+WorkingDirectory={{ homelab_api_dir }}
+ExecStart={{ homelab_api_dir }}/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port {{ homelab_api_port }}
+Restart=always
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

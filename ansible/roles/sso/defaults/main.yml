@@ -1,0 +1,55 @@
+---
+# Authelia + nginx SSO defaults
+authelia_port: 9091
+authelia_config_dir: "/opt/docker/authelia"
+nginx_config_dir: "/opt/docker/nginx-proxy"
+nginx_certs_dir: "/opt/docker/nginx-proxy/certs"
+
+# Session settings
+authelia_session_expiration: "12h"
+authelia_session_inactivity: "2h"
+
+# Services with true SSO (Tier 1 — Remote-User header)
+sso_tier1_services:
+  - { name: "sonarr", port: 8989 }
+  - { name: "radarr", port: 7878 }
+  - { name: "prowlarr", port: 9696 }
+  - { name: "bazarr", port: 6767 }
+  - { name: "grafana", port: 3060 }
+  - { name: "n8n", port: 5678 }
+  - { name: "paperless", port: 8000 }
+
+# Services with Authelia gate (Tier 2 — no built-in auth)
+sso_tier2_services:
+  - { name: "homepage", port: 3000 }
+  - { name: "it-tools", port: 8085 }
+  - { name: "stirling-pdf", port: 8084 }
+  - { name: "tdarr", port: 8265 }
+  - { name: "pulse", port: 7655 }
+  - { name: "sentinel", port: 9200 }
+
+# Services with direct passthrough (Tier 3 — own auth)
+sso_tier3_services:
+  - { name: "jellyfin", port: 8096 }
+  - { name: "qbittorrent", port: 8080 }
+  - { name: "audiobookshelf", port: 13378 }
+  - { name: "kavita", port: 5005 }
+  - { name: "portainer", port: 9000 }
+  - { name: "uptime-kuma", port: 3001 }
+  - { name: "jellyseerr", port: 5055 }
+  - { name: "gamevault", port: 8087 }
+  - { name: "romm", port: 8086 }
+  - { name: "linkwarden", port: 3050 }
+  - { name: "librarr", port: 5050 }
+  - { name: "mealie", port: 9925 }
+  - { name: "homebox", port: 7745 }
+  - { name: "calibre-web", port: 8083 }
+  - { name: "shelfarr", port: 5056 }
+  - { name: "changedetection", port: 5100 }
+  - { name: "searxng", port: 8888 }
+  - { name: "gamarr", port: 5057 }
+  - { name: "discord-bot", port: 3003 }
+
+# Wildcard cert settings
+cert_days: 3650
+cert_cn: "*.homelab.internal"
