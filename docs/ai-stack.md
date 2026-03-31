@@ -368,6 +368,21 @@ Endpoints at `/api/gaming/*` for game management:
 
 ---
 
+## File Browser
+
+A web-based file browser for accessing files across all LXC containers from any device on the network. Available on the Homepage dashboard under Tools.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/diag/files/browse?lxc=105&path=/home` | List directory contents on any LXC |
+| `POST /api/diag/files/prepare` | Prepare a file for download (copies to temp) |
+| `GET /api/diag/files/serve/{file_id}` | Download a prepared file |
+| `GET /api/diag/files/download?lxc=105&path=...` | Direct streaming download |
+
+Supports LXCs 102 (OpenClaw), 104 (Work Env), 105 (Research), 106 (AI Detector), and 228 (AIServer host). Files are pulled from containers via `pct pull` and served to the browser.
+
+---
+
 ## Storage API
 
 Per-node disk usage monitoring:
