@@ -25,8 +25,7 @@ All services run on a single privileged LXC container (12 cores, 24 GB RAM) usin
 | **audiobookshelf** | 13378 | Audiobook + podcast server | OPDS support |
 | **calibre-web** | 8083 | Ebook library (OPDS) | Backed by Calibre database |
 | **kavita** | 5005 | Comic / manga reader | Separate from ebook library |
-| **shelfarr** | 5056 | Book wishlist + tracker | Tracks wanted books, sends to Librarr |
-| **librarr** | 5050 | Book search + download | Go binary (17 MB), 13 search sources, Torznab/Newznab API, OPDS feed, Usenet/SABnzbd, modern Tailwind dark UI, series grouping, wishlist, rate limiting (via VPN) |
+| **librarr** | 5050 | Book search, request, and download manager | Go binary (17 MB), 13 search sources, user request/approval workflow, search result scoring, Open Library metadata enrichment (covers, series, descriptions), admin dashboard with activity log, file uploads, 4 download clients (qBit/SABnzbd/Deluge/Transmission), Torznab/OPDS APIs, TOTP 2FA, OIDC/SSO, Prometheus metrics |
 | **sentinel** | 9200 | Download guardian + library verification | Go binary (11 MB), SQLite persistence, multi-source fallback, definitive library verification (Jellyfin/ABS/Kavita/Sonarr/Radarr), Discord notifications |
 | **lncrawl** | — | Web novel scraper | Batch job, no persistent port |
 
