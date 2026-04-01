@@ -25,7 +25,6 @@ This repo documents the architecture, services, and lessons learned. No credenti
 │  │ Bazzite    │  │  │ Docker Host    │  │  │ LXC 102  Ollama + WebUI  │   │
 │  │ Gaming VM  │  │  │ 35+ containers │  │  │ LXC 104  Work Env        │   │
 │  │ 4c/24GB    │  │  │ 12c/24GB       │  │  │ LXC 105  ML Research     │   │
-│  │ GPU pass-  │  │  │                │  │  │ LXC 106  AI Detection    │   │
 │  │ through    │  │  │ + nginx SSO    │  │  │                           │   │
 │  │            │  │  │ + SearXNG      │  │  │                           │   │
 │  └────────────┘  │  └────────────────┘  │  ├───────────────────────────┤   │
@@ -167,7 +166,6 @@ See [AI Stack](docs/ai-stack.md) for full details.
 | 103 | gaming-bazzite | pve | VM | 7c / 24 GB | Gaming VM with GPU passthrough |
 | 104 | work-env | AIServer | LXC | 4c / 4 GB | Claude Code, Docker, dev tools |
 | 105 | research-env | AIServer | LXC | 16c / 16 GB | AI/ML research with GPU passthrough |
-| 106 | ai-detector | AIServer | LXC | 8c / 12 GB | AI text detection research |
 | 200 | docker-server | MediaServer | LXC | 12c / 24 GB | Main Docker host (55+ containers) |
 
 ---

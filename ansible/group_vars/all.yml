@@ -130,12 +130,6 @@ lxc_containers:
     privileged: false
     features: "nesting=1"
   106:
-    hostname: "ai-detector"
-    node: "aiserver"
-    cores: 8
-    memory: 12288
-    disk: "50G"
-    ip: ""
     gateway: ""
     template: "debian-12-standard_12.7-1_amd64.tar.zst"
     privileged: false

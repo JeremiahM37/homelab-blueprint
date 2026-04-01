@@ -25,10 +25,6 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │   ├── PyTorch 2.9.1 + ROCm 7.12 (native gfx1151)
 │   └── Full scientific Python stack
 │
-├── LXC 106 — "ai-detector" (12 GB — AI Detection)
-│   ├── GPU passthrough (shared iGPU)
-│   └── DeBERTa fine-tuning for AI text detection
-│
 ├── Host services:
 │   ├── Homelab API (port 9105) — unified FastAPI with AI agent (64+ tools)
 │   │   ├── /api/ai/jarvis — tool-calling agent endpoint
@@ -379,7 +375,7 @@ A web-based file browser for accessing files across all LXC containers from any 
 | `GET /api/diag/files/serve/{file_id}` | Download a prepared file |
 | `GET /api/diag/files/download?lxc=105&path=...` | Direct streaming download |
 
-Supports LXCs 102 (OpenClaw), 104 (Work Env), 105 (Research), 106 (AI Detector), and 228 (AIServer host). Files are pulled from containers via `pct pull` and served to the browser.
+Supports LXCs 102 (OpenClaw), 104 (Work Env), 105 (Research), and 228 (AIServer host). Files are pulled from containers via `pct pull` and served to the browser.
 
 ---
 
