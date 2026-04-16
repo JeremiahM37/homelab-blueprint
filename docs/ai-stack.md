@@ -395,11 +395,12 @@ Per-node disk usage monitoring:
 
 | Model | Size on GPU | Speed | Purpose |
 |-------|-------------|-------|---------|
-| **qwen3.5:35b-a3b** | 34.5 GB (GTT) | ~22 ms/token | Chat, tool calling, Tier 2 smart fixer |
-| **qwen3:1.7b** | 6.2 GB (GTT) | ~8 ms/token | Intent parsing, Tier 1 fast repairs |
-| **nomic-embed-text** | 275 MB | — | Document RAG embeddings |
+| **qwen3.5:35b-a3b** | 34.5 GB (GTT) | ~22 ms/token | Eval-proven 10/10 — tool calling, Tier 2 smart fixer, eval harness agent + judge |
+| **gemma4:e4b** | 9.6 GB (GTT) | ~12 ms/token | Production Jarvis default — faster, good for most chat |
+| **qwen3:1.7b** | 6.2 GB (GTT) | ~8 ms/token | Tier 1 fast repairs, Discord file-intent detection |
+| **nomic-embed-text** | 275 MB | — | Document RAG, episodic memory, tool-router embeddings |
 
-Both active models load entirely into GPU memory via GTT (61.7 GB available). The 2-minute idle timeout (`OLLAMA_KEEP_ALIVE=2m`) frees GPU memory when models are not in use.
+Models load into GPU memory via GTT (61.7 GB available). `OLLAMA_MAX_LOADED_MODELS=1` means only one big model resident at a time — the eval harness deliberately runs agent + judge on the **same** model to avoid thrash. Idle timeout `OLLAMA_KEEP_ALIVE=2m` reclaims GPU memory between batches.
 
 ### Open-WebUI
 
@@ -454,6 +455,194 @@ pip install torch --index-url https://rocm.nightlies.amd.com/v2/gfx1151/
 - PyTorch 2.9+ with ROCm 7.12
 - Triton 3.5+ for kernel compilation
 - 48 GB RAM, 32 vCPUs
+
+---
+
+## LLM Observability (Traces)
+
+Every Ollama call made by the homelab-api, the homelab-agent smart fixer, and the eval harness records a row in `traces.db` — an append-only SQLite store. Enables cost/latency analysis, model-vs-prompt A/B, and debugging stuck agent loops.
+
+**Schema captures:** timestamp, caller (e.g. `jarvis.agent.r0`, `smart_fixer.r3`, `evals.judge`), model, latency_ms, prompt_tokens, completion_tokens, num_tool_calls, tool_names, tool_success, error, prompt_preview, response_preview.
+
+**Never raises** — a failed insert is logged and swallowed so tracing can't take down the caller. Tracing writes from outside the API process (e.g. homelab-agent on the host) POST to `/api/traces/record`.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/traces/recent?caller=&limit=` | Newest rows, optionally filtered by caller |
+| `GET /api/traces/stats?hours=24` | Per-caller / per-model aggregates: calls, mean latency, errors, token totals |
+| `GET /api/traces/errors?limit=` | Recent errored calls for debugging |
+| `POST /api/traces/record` | Write endpoint for off-host callers (smart fixer, Discord bot) |
+
+The mobile PWA's System tab surfaces this in real time: last-24h call count, error rate, avg latency, top-4 callers table.
+
+---
+
+## Episodic Memory
+
+Chat conversations are summarized and embedded after each Jarvis turn-pair. On a new message, the top-3 most relevant prior summaries are retrieved via cosine similarity and injected into the system prompt — so the assistant remembers context across sessions and across interfaces (a preference stated on Discord is available in the PWA).
+
+**Storage:** SQLite + in-memory cosine search, no extra dependencies. A few thousand 768-dim vectors search in under 10ms in pure Python — well below the latency floor of the Ollama call they accompany.
+
+**Summarization:** `gemma4:e4b` with a 2-sentence third-person rubric that emphasizes retrieval keys (names, numbers, services) over prose.
+
+**Privacy:** PWA exposes a "Memory" modal (episodic tab) that lists recent episodes with a per-row "forget" button. Deleted summaries are wiped from both the row table and the embedding vector.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/episodic/store` | External clients (e.g. Discord) push a turn-pair for summarization |
+| `GET /api/episodic/retrieve?q=&top_k=&channel=` | Retrieve top-k relevant summaries for a query |
+| `GET /api/episodic/recent?limit=&channel=` | Most-recent-first list (no retrieval) |
+| `GET /api/episodic/stats` | Total episodes, per-channel counts, oldest/newest timestamps |
+| `DELETE /api/episodic/episode/{id}` | Forget a single episode |
+
+---
+
+## Unified Homelab RAG
+
+Extends `doc-rag` (Paperless-only previously) with a second Chroma collection (`homelab_unified`) that ingests Sonarr/Radarr/Jellyfin/homelab-agent-failures/git-commits. Each document carries a `source` metadata tag so queries can be filtered — "what movies do I have" with `?source=radarr` only returns movie data.
+
+**Ingest:** Nightly at 04:30 via systemd timer (`homelab-reindex.timer`). Each source is fetched independently so a single broken API can't take down the whole index. Fetchers are isolated — one raising an exception doesn't affect the others.
+
+**Sources:**
+- **Sonarr**: all series with monitored state + episodes-missing count
+- **Radarr**: all movies with has-file/monitored state
+- **Jellyfin**: library items (movies/shows/audiobooks) with overview + genres
+- **Agent failures**: SQLite rows from homelab-agent's failure memory
+- **Git commits**: last 200 commits across `librarr-go`, `homelab-agent`, `homelab-api`, `doc-rag`
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/homelab/ask?q=&source=` | RAG answer, optionally filtered by source |
+| `GET /api/homelab/search?q=&source=` | Raw vector-similarity results |
+| `POST /api/homelab/reindex` | Full rebuild (pull + embed all sources) |
+| `GET /api/homelab/status` | Indexed chunk count, per-source counts, last sync timestamp |
+
+Example: `/api/homelab/ask?q=what+movies+do+I+have&source=radarr` returns a real answer backed by actual Radarr inventory.
+
+---
+
+## Code Execution Sandbox
+
+The AI agent can execute Python/bash in a hardened bubblewrap sandbox — useful for ad-hoc computation, parsing text the user pasted, math, format conversions, regex checks, any quick transformation the built-in tools don't cover.
+
+**Isolation (defense in depth):**
+- `--unshare-all` plus explicit `--unshare-net` — new user/mount/pid/ipc/uts/cgroup/net namespaces
+- Read-only bind of a whitelisted set of system dirs (`/usr /lib /bin /sbin /etc/alternatives /etc/ssl/certs`)
+- Writable `/sandbox` via tmpfs, destroyed per-run
+- `prlimit` caps: 20s CPU, 512MB address space, 50MB file size, 128 file descriptors, 32 processes
+- Wall-clock timeout with `SIGKILL` on overrun (default 5s, max 30s)
+- Output truncation at 256KB/stream, code size capped at 128KB
+- `--die-with-parent` — a crashed homelab-api cannot leave orphan sandboxes
+
+**Agent tool:** `execute_code({"code": "...", "timeout": 5})` — listed in the agent's tool catalog. Semantic routing surfaces it for prompts mentioning "calculate", "compute", "parse", "python", etc. Results (stdout/stderr/exit code/runtime) are rendered inline in the PWA's chat as a collapsible code block.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/sandbox/python` | Run a Python snippet |
+| `POST /api/sandbox/bash` | Run a bash script |
+| `GET /api/sandbox/info` | Engine config + hardening status |
+
+**Security tests run in CI and nightly:** network escape attempts, SSH-keys-invisible, `/etc/shadow`-unreadable, write-outside-sandbox blocked, fork-bomb contained, memory limit enforced, timeout kills runaway loops. A failing **"sandbox network isolation BROKEN"** check in the nightly is a hard quarantine signal.
+
+---
+
+## Tier 2 Fix Verify Step
+
+After the Tier 2 smart fixer declares a fix applied, `fix_verify` independently checks whether the fix actually worked. On failure, the file edits are reverted from their pre-edit backups and `fix_applied` is downgraded so the issue escalates to Tier 3 instead of being trusted.
+
+**Checks:**
+1. **Syntax validation** on every edited file — `compile()` for `.py`, `json.loads` for `.json`, `yaml.safe_load` for `.yaml/.yml`. Unknown extensions pass by default (no false fails for files we can't easily validate).
+2. **Container health** for any containers the fixer rebuilt or restarted — `docker inspect -f '{{.State.Status}}|{{.State.Health.Status}}'` in a polling loop up to 45s. Must reach `running` (and `healthy` if a healthcheck is configured).
+3. **LLM judge** (optional, `gemma4:e4b` with `format: json`) — scores 0.0-1.0 on whether the agent's actions plausibly address the original issue. Threshold default 0.4.
+
+**Revert:** Uses the existing `smart_fixer` backup directory (`/home/admin/homelab-agent/backups/`). Finds the newest backup matching the basename, restores it, and reports the reverted paths in the result dict.
+
+Verified by 22 unit tests covering all-green, syntax-failure, container-unhealthy, low-judge-score, no-fix-applied, and judge-disabled paths.
+
+---
+
+## Semantic Tool Routing
+
+The old `_select_tools` used keyword matching — it required the literal word "verify" in a message to offer verify tools. "Is Batman in jellyfin? **prove it**" wouldn't match. Semantic routing fixes this by embedding tool descriptions once and cosine-similarity matching against the embedded user message.
+
+**Hybrid strategy (kept ≥ what keyword routing caught):**
+- Keyword hits = baseline (deterministic, preserves every previous behavior)
+- Union with top-5 semantic matches above a 0.58 cosine floor
+- Total capped at 14 tools — empirically, small models get confused by 18+
+
+**Cache:** Embeddings pickled to disk (`tool_embeddings.pkl`), keyed by tool name + description hash. Descriptions are auto-re-embedded when changed. Startup hook in `main.py` warms the cache in a background thread so uvicorn boot isn't blocked if Ollama is cold.
+
+**Fallback:** If the embedder is unreachable at request time, routing silently falls back to pure keyword. If the cache is empty at request time, returns all tools (over-inclusive > empty).
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/ai/tools/select?q=...` | Debug endpoint — shows which tools got picked and why (full ranking) |
+| `POST /api/ai/tools/warm-up` | Force re-embed after editing any tool description |
+
+The PWA's AI tab has a "🛠 Tools" button that opens this endpoint interactively — type a query, see the ranked tool list with scores and checkmarks for which were selected.
+
+---
+
+## Eval Harness
+
+Regression protection for AI changes. A canned set of prompts replays nightly against the Jarvis agent; each response is scored 0-1 by a judge model against written criteria. Results go to SQLite so the whole history is comparable.
+
+**Prompt format** (`evals/prompts.jsonl`, 10 prompts):
+```json
+{"id": "library-search",
+ "prompt": "do I have inception in my library?",
+ "expect_tools": ["search_library", "verify_in_library"],
+ "judge": "Response must give a definitive yes/no..."}
+```
+
+**What the harness revealed (and we fixed):**
+- Baseline keyword routing: 4/10 passing, mean 0.40
+- Semantic routing (uncapped): 4/10 — too many tools confused the model
+- Semantic routing (capped at 14): 5-6/10, mean 0.55
+- Stronger system prompt + hallucination-phrase detector: 7/10, mean 0.83
+- Plaintext-leak detector (`CALL list_torrents{}` → real tool_call): 9/10, mean 0.90
+- qwen3.5:35b-a3b agent + same-model judge + 3-attempt retry: **10/10, mean 1.00**, stable across 5 consecutive runs
+
+**Nightly** at 06:00 via `evals-nightly.timer`. The nightly shell checks include a regression gate (`mean >= 0.80`) — if the agent regresses, the nightly fails loudly on Discord.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/evals/run` | Run the full suite. Body: `{"run_id": ..., "model": "qwen3.5:35b-a3b"}` |
+| `GET /api/evals/latest` | Most recent run's per-prompt breakdown + mean |
+| `GET /api/evals/history?prompt_id=&limit=` | Per-prompt history for tracking regressions |
+| `GET /api/evals/trend?days=30` | Per-run aggregates over time — sparkline-ready |
+| `GET /api/evals/prompts` | Show the configured prompt set |
+
+The PWA's System tab renders a sparkline of the last 14 runs' mean scores.
+
+---
+
+## Morning Briefing
+
+Daily 08:00 Discord push summarizing overnight state. Seven sections: system health, storage (with warnings above 85%), downloads (arrived / in-flight / failed from Sentinel), recent books, agent activity (deduplicated), AI stack status (calls / error rate / latency / eval score / memory count), and errors.
+
+Color-coded embed:
+- Red: many errors OR eval score < 0.7
+- Amber: any errors
+- Blue: all green
+
+Link buttons deep-link to relevant PWA tabs (System, AI Chat, Books, Feed) so drill-down is one tap away. Interactive action buttons (e.g. "restart qbit") are deferred — they require a persistent bot listener and are a separate design.
+
+**Scheduled:** `/etc/systemd/system/morning-briefing.timer` → `morning_briefing.py` → Discord channel.
+
+---
+
+## Mobile PWA (AI surface extensions)
+
+`http://<AISERVER_IP>:9105/app` is the full daily dashboard. AI-specific extensions:
+
+| Tab / Feature | What it shows |
+|---------------|---------------|
+| **System → AI — last 24h** | LLM call count, error rate, avg latency, token total, top-4 callers table |
+| **System → Eval sparkline** | Last-14-run mean score trend, color-coded |
+| **AI → 🧠 Memory** | Modal listing episodes with a per-row "forget" button |
+| **AI → 🛠 Tools** | Modal showing semantic routing on-the-fly — type a query, see which tools would be offered and at what similarity score |
+| **AI chat code blocks** | `execute_code` tool results render as collapsible panels showing the Python source, stdout, stderr, exit code |
 
 ---
 

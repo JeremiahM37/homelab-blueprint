@@ -117,7 +117,19 @@ Download clients (qBittorrent, Librarr, Gamarr) route through a **gluetun** cont
 
 ## AI Assistant
 
-The homelab is controlled by a **tool-calling AI agent** powered by a local 35B-parameter LLM (qwen3.5:35b-a3b) running on Ollama with GPU-accelerated inference (~22 ms/token via GTT unified memory). The agent has **64+ tools** for managing every aspect of the homelab. A proactive **Homelab Agent** with 7 modules scans every 5 minutes and uses a **3-tier AI repair system** (qwen3:1.7b fast tools, qwen3.5:35b smart fixer, Claude Code backstop) to autonomously detect and fix issues.
+The homelab is controlled by a **tool-calling AI agent** powered by local LLMs (qwen3.5:35b-a3b / gemma4:e4b) running on Ollama with GPU-accelerated inference via the AMD 8060S iGPU's GTT unified memory. The agent has **66+ tools** for managing every aspect of the homelab, and hits a **10/10 mean score on the internal eval harness** across a canned set of real-world prompts.
+
+On top of the basic tool-calling loop, the stack adds:
+
+- **Semantic tool routing** — embedding-similarity hybrid replaces keyword matching (catches "prove it" → `verify_in_library`)
+- **Episodic memory** — summaries of past conversations are embedded and retrieved on new messages, so context persists across sessions and interfaces
+- **LLM observability** — every Ollama call traced to SQLite with latency / token / tool-success metadata, visible in the PWA
+- **Code execution sandbox** — `execute_code` tool runs Python in a hardened bubblewrap namespace (no network, 5s CPU, 512MB RAM, fs-isolated)
+- **Unified homelab RAG** — ChromaDB ingest of Sonarr/Radarr/Jellyfin/git/agent-failures for "ask anything about my homelab"
+- **Tier 2 verify step** — after the smart fixer declares a fix, syntax/container-health/LLM-judge checks run; any failure reverts file edits from backups
+- **Eval harness** — canned prompts + LLM judge nightly, with a regression gate in the nightly test suite
+
+A proactive **Homelab Agent** with 7 modules scans every 5 minutes and uses a **3-tier AI repair system** (qwen3:1.7b fast tools → qwen3.5:35b smart fixer with verify → Claude Code backstop) to autonomously detect and fix issues.
 
 ### How It Works
 
@@ -194,15 +206,20 @@ See [AI Stack](docs/ai-stack.md) for full details.
 - **~188 GB total RAM** across the cluster
 - **8 TB DAS** for media storage
 - **GPU passthrough** on 2 nodes (NVIDIA for gaming, AMD iGPU shared across 3 LXCs for ML)
-- **AI tool-calling agent** — 64+ tools, local 35B LLM (qwen3.5:35b-a3b), GPU-accelerated (~22 ms/token via GTT unified memory), controls the entire homelab via natural language
-- **Smart routing** — fast 1.7B model for chat/intent (~8 ms/token), 35B model for tool-calling actions
-- **Conversation memory** — persistent chat history per channel, user preference learning, new release watchlist
-- **3 agent interfaces** — Discord bot, Homepage chat widget, Open WebUI (same brain, same tools)
+- **AI tool-calling agent** — 66+ tools, local LLMs (qwen3.5:35b-a3b + gemma4:e4b), GPU-accelerated via GTT unified memory, **10/10 stable on internal eval harness**
+- **Semantic tool routing** — embedding-similarity tool retrieval (catches paraphrases the old keyword router missed); hybrid with keyword hits as a baseline floor
+- **Episodic memory** — past chats are summarized + embedded + retrieved cross-interface, so the assistant remembers context between Discord, PWA, and Open WebUI sessions
+- **LLM observability** — SQLite trace of every Ollama call (latency/tokens/tool success/errors); real-time stats rendered on the mobile PWA
+- **Code execution sandbox** — Python/bash tool runs in a bubblewrap-isolated namespace (no network, fs-isolated, resource-capped, timeout-enforced)
+- **Unified homelab RAG** — ChromaDB ingest of Sonarr/Radarr/Jellyfin/git/agent-failures; natural-language queries against every source with `?source=` filter
+- **Tier 2 verify step** — smart fixer's fixes are independently validated (syntax / container health / LLM judge); file edits auto-revert from backup on failure
+- **Eval harness** — 10 canned prompts replayed nightly with LLM judge scoring, SQLite history, regression gate in nightly tests
+- **4 agent interfaces** — Discord bot, Homepage chat widget, mobile PWA, Open WebUI (same brain, same tools)
 - **Librarr (Go)** — 18 MB binary, 13 search sources, Torznab/Newznab API, OPDS feed, Usenet/SABnzbd, multi-user with TOTP 2FA + OIDC/SSO, modern dark Tailwind UI with series grouping and wishlist
 - **Sentinel (Go)** — 11 MB binary, download guardian with SQLite persistence, definitive library verification (Jellyfin/ABS/Kavita/Sonarr/Radarr)
 - **Homelab Agent** — proactive monitoring every 5min, 7 modules (container doctor, source intelligence, import watchdog, torrent doctor, system monitor, notifications, AI escalation), 3-tier AI repair system, failure memory (SQLite)
 - **Service integrations** — Mealie recipe import, Changedetection URL watches, Linkwarden bookmarks, AI auto-tagging for Paperless, Docker container control (restart/stop/start)
-- **88 nightly tests** — comprehensive end-to-end tests at 5 AM (~60s), covers all services + smart fixer + escalation, Discord results
+- **100+ nightly tests** — comprehensive end-to-end tests at 5 AM, covers all services + smart fixer + escalation + AI stack (traces/memory/sandbox/RAG/evals/semantic routing), plus an eval-score regression gate; 128 unit tests across homelab-api/doc-rag/homelab-agent, Discord results notification
 - **SearXNG** — self-hosted web search for AI agent, Homepage dashboard, Open WebUI
 - **Diagnostic toolkit** — file ops, log reading, permission fixes, library rescans for AI escalation
 - **Unified API** — single FastAPI endpoint aggregating all services (Swagger docs included)
