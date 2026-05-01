@@ -71,7 +71,7 @@ When the agent detects an issue, it escalates through three tiers:
 ```
 Issue detected
   │
-  ├── Tier 1: qwen3:1.7b (instant, tool calls via Jarvis API)
+  ├── Tier 1: qwen3:1.7b (instant, tool calls via AI agent API)
   │     Handles ~90% of issues in <1 second
   │     Tools: restart, permissions, rescan, search, download
   │     ├── Fixed? → log + notify → done
@@ -247,7 +247,7 @@ Start all: `/home/admin/web-terminals/start-terminals.sh`
 
 A floating chat bubble (implemented via `custom.js` and `custom.css`) that connects to the AI agent:
 
-- Sends messages to `/api/ai/jarvis`
+- Sends messages to `/api/ai/agent`
 - Shows **tool-call progress indicators** as the agent works
 - Supports the full 64+ tool set from the dashboard
 

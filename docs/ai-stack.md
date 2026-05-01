@@ -27,7 +27,7 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │
 ├── Host services:
 │   ├── Homelab API (port 9105) — unified FastAPI with AI agent (64+ tools)
-│   │   ├── /api/ai/jarvis — tool-calling agent endpoint
+│   │   ├── /api/ai/agent — tool-calling agent endpoint
 │   │   ├── /api/guardian/* — proxies to Go Sentinel
 │   │   ├── /api/verify/* — proxies to Go Sentinel library verification
 │   │   ├── /api/diag/* — diagnostic tools
@@ -69,7 +69,7 @@ The Radeon 8060S on Strix Halo uses **GTT (Graphics Translation Table) memory** 
 
 ## AI Tool-Calling Agent
 
-The `/api/ai/jarvis` endpoint is a full tool-calling agent — not just a chat wrapper. It uses Ollama's native tool calling with qwen3.5:35b-a3b to decide which actions to take, execute them, and synthesize results.
+The `/api/ai/agent` endpoint is a full tool-calling agent — not just a chat wrapper. It uses Ollama's native tool calling with qwen3.5:35b-a3b to decide which actions to take, execute them, and synthesize results.
 
 ### Agent Loop (Intent Routing)
 
@@ -83,7 +83,7 @@ User message (any interface)
                           └── Generate response (or make more tool calls)
 
 Homelab Agent detects issue
-  └── Tier 1: qwen3:1.7b tries Jarvis tools (fast, <1 second)
+  └── Tier 1: qwen3:1.7b tries agent tools (fast, <1 second)
         └── fails → Tier 2: qwen3.5:35b-a3b smart fixer (think: true, 19 tools)
               └── fails → Tier 3: writes fix-request.md → Claude Code (every 5 hours)
 ```
@@ -132,7 +132,7 @@ The homelab uses a tiered approach to autonomous repair, escalating from fast/ch
 
 - **Model**: qwen3:1.7b (~8 ms/token, 6.2 GB on GPU)
 - **When**: First response to any detected issue
-- **How**: Calls Jarvis API tools directly — restart containers, fix permissions, rescan libraries, search/download, check status
+- **How**: Calls AI agent API tools directly — restart containers, fix permissions, rescan libraries, search/download, check status
 - **Handles**: ~90% of issues in under 1 second
 - **Example**: Container crashed → restart via Docker API → verify it came back → done
 
@@ -396,7 +396,7 @@ Per-node disk usage monitoring:
 | Model | Size on GPU | Speed | Purpose |
 |-------|-------------|-------|---------|
 | **qwen3.5:35b-a3b** | 34.5 GB (GTT) | ~22 ms/token | Eval-proven 10/10 — tool calling, Tier 2 smart fixer, eval harness agent + judge |
-| **gemma4:e4b** | 9.6 GB (GTT) | ~12 ms/token | Production Jarvis default — faster, good for most chat |
+| **gemma4:e4b** | 9.6 GB (GTT) | ~12 ms/token | Production agent default — faster, good for most chat |
 | **qwen3:1.7b** | 6.2 GB (GTT) | ~8 ms/token | Tier 1 fast repairs, Discord file-intent detection |
 | **nomic-embed-text** | 275 MB | — | Document RAG, episodic memory, tool-router embeddings |
 
@@ -462,7 +462,7 @@ pip install torch --index-url https://rocm.nightlies.amd.com/v2/gfx1151/
 
 Every Ollama call made by the homelab-api, the homelab-agent smart fixer, and the eval harness records a row in `traces.db` — an append-only SQLite store. Enables cost/latency analysis, model-vs-prompt A/B, and debugging stuck agent loops.
 
-**Schema captures:** timestamp, caller (e.g. `jarvis.agent.r0`, `smart_fixer.r3`, `evals.judge`), model, latency_ms, prompt_tokens, completion_tokens, num_tool_calls, tool_names, tool_success, error, prompt_preview, response_preview.
+**Schema captures:** timestamp, caller (e.g. `ai.agent.r0`, `smart_fixer.r3`, `evals.judge`), model, latency_ms, prompt_tokens, completion_tokens, num_tool_calls, tool_names, tool_success, error, prompt_preview, response_preview.
 
 **Never raises** — a failed insert is logged and swallowed so tracing can't take down the caller. Tracing writes from outside the API process (e.g. homelab-agent on the host) POST to `/api/traces/record`.
 
@@ -479,7 +479,7 @@ The mobile PWA's System tab surfaces this in real time: last-24h call count, err
 
 ## Episodic Memory
 
-Chat conversations are summarized and embedded after each Jarvis turn-pair. On a new message, the top-3 most relevant prior summaries are retrieved via cosine similarity and injected into the system prompt — so the assistant remembers context across sessions and across interfaces (a preference stated on Discord is available in the PWA).
+Chat conversations are summarized and embedded after each agent turn-pair. On a new message, the top-3 most relevant prior summaries are retrieved via cosine similarity and injected into the system prompt — so the assistant remembers context across sessions and across interfaces (a preference stated on Discord is available in the PWA).
 
 **Storage:** SQLite + in-memory cosine search, no extra dependencies. A few thousand 768-dim vectors search in under 10ms in pure Python — well below the latency floor of the Ollama call they accompany.
 
@@ -585,7 +585,7 @@ The PWA's AI tab has a "🛠 Tools" button that opens this endpoint interactivel
 
 ## Eval Harness
 
-Regression protection for AI changes. A canned set of prompts replays nightly against the Jarvis agent; each response is scored 0-1 by a judge model against written criteria. Results go to SQLite so the whole history is comparable.
+Regression protection for AI changes. A canned set of prompts replays nightly against the AI agent; each response is scored 0-1 by a judge model against written criteria. Results go to SQLite so the whole history is comparable.
 
 **Prompt format** (`evals/prompts.jsonl`, 10 prompts):
 ```json

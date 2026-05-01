@@ -14,7 +14,7 @@ A custom Discord bot (`discord-bot` container, port 3003) with a local LLM-power
 Discord message
   → *ai <anything>
   → qwen3:1.7b on Ollama (LXC 102, AMD iGPU) — intent parsing
-  → Route to /api/ai/jarvis (tool-calling agent)
+  → Route to /api/ai/agent (tool-calling agent)
   → qwen3.5:35b-a3b decides which tools to call
   → Execute against homelab APIs
   → Response back to Discord
@@ -113,7 +113,7 @@ A FastAPI service on AIServer (port 9105) that aggregates ALL homelab services i
 | `GET /api/media/now-playing` | Jellyfin active streams |
 | `GET /api/media/calendar` | Upcoming episodes + movies |
 | `GET /api/downloads/speed` | qBit transfer speeds |
-| `POST /api/ai/jarvis` | Tool-calling AI agent |
+| `POST /api/ai/agent` | Tool-calling AI agent |
 | `POST /api/ai/chat` | Chat with local LLM |
 | `GET /api/ai/ask-docs?q=...` | RAG query over documents |
 | `GET /api/verify/check` | Verify item in specific library |
@@ -256,7 +256,7 @@ A proactive monitoring agent on AIServer (port 9106) that scans the entire homel
 | **Container Doctor** | Monitors 14 key containers, auto-restarts, crash loop detection | Every 15 min |
 | **Source Intelligence** | Checks all 13 Librarr search sources, tracks availability | Every 60 min |
 | **Import Watchdog** | Detects stuck downloads and failed imports, auto-retries | Every 15 min |
-| **AI Escalation** | Escalates complex failures to `/api/ai/jarvis` for AI diagnosis | On failure |
+| **AI Escalation** | Escalates complex failures to `/api/ai/agent` for AI diagnosis | On failure |
 | **Download Notifications** | Checks Sonarr/Radarr history for new completions, posts Discord embeds with poster art | Every 15 min |
 | **Release Watcher** | Searches web for new releases from watched series/authors | Every 60 min |
 

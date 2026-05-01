@@ -29,7 +29,7 @@ This repo documents the architecture, services, and lessons learned. No credenti
 │  │            │  │  │ + SearXNG      │  │  │                           │   │
 │  └────────────┘  │  └────────────────┘  │  ├───────────────────────────┤   │
 │                  │                      │  │ Homelab API   :9105       │   │
-│  * Only GPU in   │  DAS: 8TB btrfs      │  │  └─ AI Agent (Jarvis)    │   │
+│  * Only GPU in   │  DAS: 8TB btrfs      │  │  └─ AI Agent    │   │
 │    system —      │  (USB TerraMaster)   │  │  └─ Download Guardian    │   │
 │    host goes     │                      │  │  └─ Library Verification │   │
 │    headless      │                      │  │  └─ Diagnostic Tools     │   │
@@ -43,7 +43,7 @@ This repo documents the architecture, services, and lessons learned. No credenti
 │   │                                                                    │    │
 │   │  Interfaces:                                                       │    │
 │   │    Discord bot (*ai) ──┐                                           │    │
-│   │    Homepage chat ──────┼── /api/ai/jarvis ── tool loop ── execute  │    │
+│   │    Homepage chat ──────┼── /api/ai/agent ── tool loop ── execute  │    │
 │   │    Open WebUI (MCP) ──┘                                           │    │
 │   │                                                                    │    │
 │   │  Subsystems:                                                       │    │
@@ -135,7 +135,7 @@ A proactive **Homelab Agent** with 7 modules scans every 5 minutes and uses a **
 
 ```
 User (Discord / Homepage / Open WebUI)
-  └── /api/ai/jarvis
+  └── /api/ai/agent
         └── LLM decides which tools to call
               └── Executes against homelab APIs
                     └── Feeds results back to LLM
@@ -162,7 +162,7 @@ All three interfaces share the same agent brain:
 | **Diagnostic Tools** | File ops, log reading, permission fixes, library rescans — for AI escalation |
 | **SearXNG** | Self-hosted web search for AI agent, Homepage, Open WebUI |
 | **Paperless Tagging** | AI-driven document tagging and correspondent assignment |
-| **Gaming API** | Game search, ROM download, sync status, Bazzite VM control |
+| **Gamarr** | Go binary, game/ROM search + download (Prowlarr/Myrient/Vimm), torrent completion watcher, OIDC/SSO, TOTP 2FA, invite codes, Bazzite VM sync |
 | **Nightly Tests** | 88 end-to-end tests at 5 AM (~60s), Discord results notification |
 
 See [AI Stack](docs/ai-stack.md) for full details.
@@ -243,7 +243,7 @@ Custom Go services built for this homelab, available as standalone projects:
 |---------|----------|-------------|
 | [Librarr](https://github.com/JeremiahM37/librarr) | Go | Book/audiobook/manga search + download, 13 sources, Torznab API, OPDS feed |
 | [Sentinel](https://github.com/JeremiahM37/sentinel) | Go | Download guardian with library verification (Jellyfin/ABS/Kavita/Sonarr/Radarr) |
-| [Gamarr](https://github.com/JeremiahM37/gamarr) | Go | Game/ROM search + download, 24 platforms, 3 sources, 43 e2e tests |
+| [Gamarr](https://github.com/JeremiahM37/gamarr) | Go | Game/ROM search + download, 24 platforms, 3 sources, OIDC/SSO, TOTP 2FA, torrent watcher, 43 e2e tests |
 | [Homelab Blueprint](https://github.com/JeremiahM37/homelab-blueprint) | Docs | This repo — architecture documentation |
 
 ---
