@@ -6,7 +6,7 @@ Everything built to run autonomously with minimal human intervention.
 
 ## Discord AI Bot
 
-A custom Discord bot (`discord-bot` container, port 3003) with a local LLM-powered `*ai` command that routes natural language to 64+ tools across 15+ services.
+A custom Discord bot (`discord-bot` container, port 3003) with a local LLM-powered `*ai` command that routes natural language to 70+ tools across 15+ services.
 
 ### Architecture
 
@@ -23,7 +23,7 @@ Discord message
 ### Performance
 - Intent parsing: **<1 second** (think mode disabled)
 - Tool-calling agent: 2-10 seconds depending on tool chain complexity
-- System prompt: ~1,141 tokens, 64+ tools
+- System prompt: ~1,141 tokens, 70+ tools
 - Model: qwen3:1.7b (~1.4GB) for intent, qwen3.5:35b-a3b (23GB) for agent
 - Cost: **$0** (local inference)
 

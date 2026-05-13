@@ -26,7 +26,7 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │   └── Full scientific Python stack
 │
 ├── Host services:
-│   ├── Homelab API (port 9105) — unified FastAPI with AI agent (64+ tools)
+│   ├── Homelab API (port 9105) — unified FastAPI with AI agent (70+ tools)
 │   │   ├── /api/ai/agent — tool-calling agent endpoint
 │   │   ├── /api/guardian/* — proxies to Go Sentinel
 │   │   ├── /api/verify/* — proxies to Go Sentinel library verification
@@ -51,7 +51,7 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │   └── JSON API at /search?q=...&format=json
 │
 └── Discord Bot AI (runs on LXC 200, calls Ollama on LXC 102)
-    └── *ai command — 64+ tools via agent loop
+    └── *ai command — 70+ tools via agent loop
 ```
 
 ### GPU (AMD 8060S iGPU — Unified Memory)
@@ -77,7 +77,7 @@ The `/api/ai/agent` endpoint is a full tool-calling agent — not just a chat wr
 User message (any interface)
   └── qwen3:1.7b intent classifier
         ├── "chat" → qwen3:1.7b generates simple response (~8ms/token)
-        └── "action" → qwen3:1.7b tool calling (64+ tools, sub-second parsing)
+        └── "action" → qwen3:1.7b tool calling (70+ tools, sub-second parsing)
               └── Execute tool calls against homelab APIs
                     └── Feed results back to LLM
                           └── Generate response (or make more tool calls)
@@ -99,7 +99,7 @@ The same agent brain powers three interfaces:
 | **Mobile PWA** | `/app` endpoint | AI chat with 120s timeout for mobile use |
 | **Open WebUI** | MCP tools via mcpo proxy | Full chat UI with conversation history |
 
-### Tool Categories (64+)
+### Tool Categories (70+)
 
 | Category | Tools | Examples |
 |----------|-------|---------|
@@ -646,7 +646,7 @@ Link buttons deep-link to relevant PWA tabs (System, AI Chat, Books, Feed) so dr
 
 ---
 
-## Nightly Tests (88 tests, 5 AM daily)
+## Nightly Tests (165+ tests, 5 AM daily)
 
 Comprehensive end-to-end test suite that validates every service in the homelab is functioning correctly.
 
@@ -654,4 +654,4 @@ Comprehensive end-to-end test suite that validates every service in the homelab 
 - **Location**: `/home/admin/nightly-tests/run_all.sh`
 - **Coverage**: HTTP health checks, API endpoints, SSH connectivity, Docker containers, Proxmox cluster, smart fixer validation, tiered escalation checks, 35b model responsiveness
 - **Notification**: Results posted to Discord with pass/fail summary
-- **Runtime**: ~60 seconds for all 88 tests
+- **Runtime**: ~10 minutes for the full suite

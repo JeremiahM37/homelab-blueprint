@@ -44,7 +44,7 @@ Multiple layers of monitoring ensure services stay healthy with minimal manual i
 Simple uptime monitoring for all services. Checks HTTP endpoints, TCP ports, and ping targets. Sends alerts when services go down.
 
 - Port: 3001
-- Monitors all 35+ Docker services + external endpoints
+- Monitors all 55+ Docker services + external endpoints
 
 ---
 
@@ -249,7 +249,7 @@ A floating chat bubble (implemented via `custom.js` and `custom.css`) that conne
 
 - Sends messages to `/api/ai/agent`
 - Shows **tool-call progress indicators** as the agent works
-- Supports the full 64+ tool set from the dashboard
+- Supports the full 70+ tool set from the dashboard
 
 ### Search Widget
 
@@ -264,7 +264,7 @@ search:
 
 ---
 
-## Nightly Tests (88 tests, 5 AM daily)
+## Nightly Tests (165+ tests, 5 AM daily)
 
 Comprehensive end-to-end test suite that validates every service in the homelab is functioning correctly.
 
@@ -272,7 +272,7 @@ Comprehensive end-to-end test suite that validates every service in the homelab 
 - **Location**: `/home/admin/nightly-tests/run_all.sh`
 - **Coverage**: HTTP health checks, API endpoints, SSH connectivity, Docker containers, Proxmox cluster, smart fixer validation, tiered escalation checks, 35b model responsiveness
 - **Notification**: Results posted to Discord via Python JSON builder (avoids newline escaping issues with bash)
-- **Runtime**: ~60 seconds for all 88 tests
+- **Runtime**: ~10 minutes for the full suite
 
 ---
 

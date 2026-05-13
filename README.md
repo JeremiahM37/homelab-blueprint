@@ -23,8 +23,8 @@ This repo documents the architecture, services, and lessons learned. No credenti
 │  ┌────────────┐  │  ┌────────────────┐  │  ┌───────────────────────────┐   │
 │  │ VM 103     │  │  │ LXC 200        │  │  │ LXC 101  Dev Workspace   │   │
 │  │ Bazzite    │  │  │ Docker Host    │  │  │ LXC 102  Ollama + WebUI  │   │
-│  │ Gaming VM  │  │  │ 35+ containers │  │  │ LXC 104  Work Env        │   │
-│  │ 4c/24GB    │  │  │ 12c/24GB       │  │  │ LXC 105  ML Research     │   │
+│  │ Gaming VM  │  │  │ 55+ containers │  │  │ LXC 104  Work Env        │   │
+│  │ 7c/24GB    │  │  │ 12c/24GB       │  │  │ LXC 105  ML Research     │   │
 │  │ through    │  │  │ + nginx SSO    │  │  │                           │   │
 │  │            │  │  │ + SearXNG      │  │  │                           │   │
 │  └────────────┘  │  └────────────────┘  │  ├───────────────────────────┤   │
@@ -39,7 +39,7 @@ This repo documents the architecture, services, and lessons learned. No credenti
 ├──────────────────┴──────────────────────┴───────────────────────────────────┤
 │                                                                             │
 │   ┌── AI Agent Brain ──────────────────────────────────────────────────┐    │
-│   │  qwen3.5:35b-a3b on Ollama (native tool calling, 64+ tools)      │    │
+│   │  qwen3.5:35b-a3b on Ollama (native tool calling, 70+ tools)      │    │
 │   │                                                                    │    │
 │   │  Interfaces:                                                       │    │
 │   │    Discord bot (*ai) ──┐                                           │    │
@@ -53,7 +53,7 @@ This repo documents the architecture, services, and lessons learned. No credenti
 │   │    SearXNG (self-hosted web search) ─── Open WebUI + Homepage     │    │
 │   │    Homelab Agent (proactive: 7 modules, 3-tier AI repair,         │    │
 │   │      every 5min, port 9106)                                      │    │
-│   │    Nightly Tests (88 tests at 5 AM, Discord results)             │    │
+│   │    Nightly Tests (165+ tests at 5 AM, Discord results)           │    │
 │   └────────────────────────────────────────────────────────────────────┘    │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -117,7 +117,7 @@ Download clients (qBittorrent, Librarr, Gamarr) route through a **gluetun** cont
 
 ## AI Assistant
 
-The homelab is controlled by a **tool-calling AI agent** powered by local LLMs (qwen3.5:35b-a3b / gemma4:e4b) running on Ollama with GPU-accelerated inference via the AMD 8060S iGPU's GTT unified memory. The agent has **66+ tools** for managing every aspect of the homelab, and hits a **10/10 mean score on the internal eval harness** across a canned set of real-world prompts.
+The homelab is controlled by a **tool-calling AI agent** powered by local LLMs (qwen3.5:35b-a3b / gemma4:e4b) running on Ollama with GPU-accelerated inference via the AMD 8060S iGPU's GTT unified memory. The agent has **70+ tools** for managing every aspect of the homelab, and hits a **10/10 mean score on the internal eval harness** across a canned set of real-world prompts.
 
 On top of the basic tool-calling loop, the stack adds:
 
@@ -163,7 +163,7 @@ All three interfaces share the same agent brain:
 | **SearXNG** | Self-hosted web search for AI agent, Homepage, Open WebUI |
 | **Paperless Tagging** | AI-driven document tagging and correspondent assignment |
 | **Gamarr** | Go binary, game/ROM search + download (Prowlarr/Myrient/Vimm), torrent completion watcher, OIDC/SSO, TOTP 2FA, invite codes, Bazzite VM sync |
-| **Nightly Tests** | 88 end-to-end tests at 5 AM (~60s), Discord results notification |
+| **Nightly Tests** | 165+ end-to-end tests at 5 AM (~10 min), Discord results notification |
 
 See [AI Stack](docs/ai-stack.md) for full details.
 
@@ -206,7 +206,7 @@ See [AI Stack](docs/ai-stack.md) for full details.
 - **~188 GB total RAM** across the cluster
 - **8 TB DAS** for media storage
 - **GPU passthrough** on 2 nodes (NVIDIA for gaming, AMD iGPU shared across 3 LXCs for ML)
-- **AI tool-calling agent** — 66+ tools, local LLMs (qwen3.5:35b-a3b + gemma4:e4b), GPU-accelerated via GTT unified memory, **10/10 stable on internal eval harness**
+- **AI tool-calling agent** — 70+ tools, local LLMs (qwen3.5:35b-a3b + gemma4:e4b), GPU-accelerated via GTT unified memory, **10/10 stable on internal eval harness**
 - **Semantic tool routing** — embedding-similarity tool retrieval (catches paraphrases the old keyword router missed); hybrid with keyword hits as a baseline floor
 - **Episodic memory** — past chats are summarized + embedded + retrieved cross-interface, so the assistant remembers context between Discord, PWA, and Open WebUI sessions
 - **LLM observability** — SQLite trace of every Ollama call (latency/tokens/tool success/errors); real-time stats rendered on the mobile PWA
@@ -219,7 +219,7 @@ See [AI Stack](docs/ai-stack.md) for full details.
 - **Sentinel (Go)** — 11 MB binary, download guardian with SQLite persistence, definitive library verification (Jellyfin/ABS/Kavita/Sonarr/Radarr)
 - **Homelab Agent** — proactive monitoring every 5min, 7 modules (container doctor, source intelligence, import watchdog, torrent doctor, system monitor, notifications, AI escalation), 3-tier AI repair system, failure memory (SQLite)
 - **Service integrations** — Mealie recipe import, Changedetection URL watches, Linkwarden bookmarks, AI auto-tagging for Paperless, Docker container control (restart/stop/start)
-- **100+ nightly tests** — comprehensive end-to-end tests at 5 AM, covers all services + smart fixer + escalation + AI stack (traces/memory/sandbox/RAG/evals/semantic routing), plus an eval-score regression gate; 128 unit tests across homelab-api/doc-rag/homelab-agent, Discord results notification
+- **165+ nightly tests** — comprehensive end-to-end tests at 5 AM, covers all services + smart fixer + escalation + AI stack (traces/memory/sandbox/RAG/evals/semantic routing), plus an eval-score regression gate; 128 unit tests across homelab-api/doc-rag/homelab-agent, Discord results notification
 - **SearXNG** — self-hosted web search for AI agent, Homepage dashboard, Open WebUI
 - **Diagnostic toolkit** — file ops, log reading, permission fixes, library rescans for AI escalation
 - **Unified API** — single FastAPI endpoint aggregating all services (Swagger docs included)
