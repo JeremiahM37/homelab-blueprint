@@ -22,6 +22,8 @@ Hard-won knowledge from building and maintaining this homelab. Sorted by categor
 
 - **Permission errors show as "error" state in qBit.** If qBittorrent shows a torrent in error state, it's almost always `chown 1000:1000` needed on the download directory.
 - **`network_mode: "service:gluetun"` means shared fate.** If gluetun restarts, all dependent containers lose networking. Order your restart logic accordingly.
+- **Recreating gluetun (not just restarting) orphans its dependents.** When gluetun is *recreated* (compose up, image update, reboot) it gets a new container ID and a new network namespace, but dependents (`network_mode: service:gluetun`) stay pinned to the dead namespace — every published port returns `000` externally while loopback inside still works, so a naive healthcheck can't see it. `docker restart <dep>` fails with "No such container: <old id>", and a plain `docker compose up` often won't recreate (config hash unchanged). The fix is `docker compose up -d --force-recreate --no-deps <dep>`. Automate it: a small host service that every ~15s compares each dependent's netns target to gluetun's current ID and force-recreates mismatches once gluetun is healthy.
+- **Pin the VPN MTU if "handshake works but no traffic."** A WireGuard tunnel can connect cleanly yet black-hole all data when PMTU discovery fails. Pinning `WIREGUARD_MTU=1280` fixes it.
 - **Container restarts kill in-progress state.** Job queues, download progress, and other in-memory state is lost on restart. Don't restart containers just to "fix" transient issues.
 - **DNS search domains leak into containers.** If your host has a search domain (e.g., from DHCP), containers inherit it. Add `dns_search: [""]` to prevent DNS resolution weirdness.
 

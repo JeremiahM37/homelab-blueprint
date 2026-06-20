@@ -104,7 +104,7 @@ Internet
         │           └── SearXNG (self-hosted web search)
         │
         └── AIServer node
-              ├── LXC 101-106 — bridged LAN
+              ├── LXC 100-105 — bridged LAN
               ├── Homelab API + AI Agent (port 9105)
               └── MCP server (Proxmox management)
 ```
@@ -173,12 +173,13 @@ See [AI Stack](docs/ai-stack.md) for full details.
 
 | VMID | Name | Node | Type | Resources | Purpose |
 |------|------|------|------|-----------|---------|
+| 100 | homelab-agent | AIServer | LXC | 4c / 8 GB | Self-healing Homelab Agent (7 modules, 3-tier AI repair, port 9106) |
 | 101 | project-env | AIServer | LXC | 4c / 4 GB | Development workspace |
 | 102 | openclaw | AIServer | LXC | 16c / 28 GB | Local LLM chat (Ollama + Open-WebUI) |
 | 103 | gaming-bazzite | pve | VM | 7c / 24 GB | Gaming VM with GPU passthrough |
 | 104 | work-env | AIServer | LXC | 4c / 4 GB | Claude Code, Docker, dev tools |
-| 105 | research-env | AIServer | LXC | 16c / 16 GB | AI/ML research with GPU passthrough |
-| 200 | docker-server | MediaServer | LXC | 12c / 24 GB | Main Docker host (55+ containers) |
+| 105 | research-env | AIServer | LXC | 16c / 32 GB | AI/ML research with GPU passthrough (gfx1151, PyTorch ROCm) |
+| 200 | docker-server | MediaServer | LXC | 12c / 24 GB | Main Docker host (57+ containers) |
 
 ---
 
@@ -201,8 +202,8 @@ See [AI Stack](docs/ai-stack.md) for full details.
 
 ## Quick Stats
 
-- **7 guests** across 3 nodes (6 LXC + 1 VM)
-- **55+ Docker containers** on a single LXC
+- **8 guests** across 3 nodes (7 LXC + 1 VM)
+- **57+ Docker containers** on a single LXC
 - **~188 GB total RAM** across the cluster
 - **8 TB DAS** for media storage
 - **GPU passthrough** on 2 nodes (NVIDIA for gaming, AMD iGPU shared across 3 LXCs for ML)
@@ -219,13 +220,14 @@ See [AI Stack](docs/ai-stack.md) for full details.
 - **Sentinel (Go)** — 11 MB binary, download guardian with SQLite persistence, definitive library verification (Jellyfin/ABS/Kavita/Sonarr/Radarr)
 - **Homelab Agent** — proactive monitoring every 5min, 7 modules (container doctor, source intelligence, import watchdog, torrent doctor, system monitor, notifications, AI escalation), 3-tier AI repair system, failure memory (SQLite)
 - **Service integrations** — Mealie recipe import, Changedetection URL watches, Linkwarden bookmarks, AI auto-tagging for Paperless, Docker container control (restart/stop/start)
+- **Self-hosted notes + scratchpad** — SilverBullet Markdown notebook (`notes.homelab.internal`, wikilinks/backlinks/full-text search) and a disposable mini-app host (`lab.homelab.internal`, single-binary Go static+KV server); both installable PWAs
 - **165+ nightly tests** — comprehensive end-to-end tests at 5 AM, covers all services + smart fixer + escalation + AI stack (traces/memory/sandbox/RAG/evals/semantic routing), plus an eval-score regression gate; 128 unit tests across homelab-api/doc-rag/homelab-agent, Discord results notification
 - **SearXNG** — self-hosted web search for AI agent, Homepage dashboard, Open WebUI
 - **Diagnostic toolkit** — file ops, log reading, permission fixes, library rescans for AI escalation
 - **Unified API** — single FastAPI endpoint aggregating all services (Swagger docs included)
 - **Document RAG** — vector search over 169+ documents via local embeddings + LLM
 - **Automated backups** — Restic to DAS, 4 nodes, daily, encrypted, deduplicated
-- **SSO reverse proxy** — nginx + Authelia, 34 subdomains on `*.homelab.internal`, 3-tier auth (true SSO / gate / passthrough), self-signed wildcard cert, dnsmasq for LAN + Tailscale split DNS for remote
+- **SSO reverse proxy** — nginx + Authelia, 36 subdomains on `*.homelab.internal`, 3-tier auth (true SSO / gate / passthrough), self-signed wildcard cert, dnsmasq for LAN + Tailscale split DNS for remote
 - **CrowdSec IPS** — 1400+ malicious IPs blocked at firewall, community threat intel
 - **Terraform IaC** — entire cluster defined as code, importable state
 - **9 n8n workflows** — dual-channel Discord alerts, watchdogs, health checks
@@ -244,6 +246,11 @@ Custom Go services built for this homelab, available as standalone projects:
 | [Librarr](https://github.com/JeremiahM37/librarr) | Go | Book/audiobook/manga search + download, 13 sources, Torznab API, OPDS feed |
 | [Sentinel](https://github.com/JeremiahM37/sentinel) | Go | Download guardian with library verification (Jellyfin/ABS/Kavita/Sonarr/Radarr) |
 | [Gamarr](https://github.com/JeremiahM37/gamarr) | Go | Game/ROM search + download, 24 platforms, 3 sources, OIDC/SSO, TOTP 2FA, torrent watcher, 43 e2e tests |
+| [gpu-graph-mcp](https://github.com/JeremiahM37/gpu-graph-mcp) | C11 | Zero-dependency MCP server indexing live GPU/accelerator state as a queryable knowledge graph (NVIDIA + AMD), cutting token cost vs. parsing `nvidia-smi`/`rocm-smi` |
+| [mttyd](https://github.com/JeremiahM37/mttyd) | JS/HTML | Mobile-friendly ttyd wrapper — xterm.js terminal PWA with on-screen keybar and history suggestions |
+| [pocketlab](https://github.com/JeremiahM37/pocketlab) | Python | Generalized mobile PWA host extracted from this homelab's dashboard/terminal stack |
+| [verify](https://github.com/JeremiahM37/verify) | Python | CLI that runs a project's tests + service/endpoint/log checks + a real headless-browser UI flow before declaring a change "done" |
+| [strix-halo-sglang](https://github.com/JeremiahM37/strix-halo-sglang) | Docker | SGLang inference stack for AMD Strix Halo (gfx1151) |
 | [Homelab Blueprint](https://github.com/JeremiahM37/homelab-blueprint) | Docs | This repo — architecture documentation |
 
 ---

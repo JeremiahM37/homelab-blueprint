@@ -57,6 +57,8 @@ All services run on a single privileged LXC container (12 cores, 24 GB RAM) usin
 | **changedetection** | 5100 | Website change monitor | With headless Chrome |
 | **stirling-pdf** | 8084 | PDF tools | |
 | **it-tools** | 8085 | Developer utilities | |
+| **silverbullet** | 3002 | Self-hosted Markdown notes | SilverBullet — wikilinks, backlinks, full-text search, installable PWA; notes are plain `.md` files on disk |
+| **lab** | 8099 | Disposable mini-app / widget host | Single-binary Go static server + flat-file KV store; add/remove apps via a registry, installable PWA |
 
 ### Search
 
@@ -68,7 +70,7 @@ All services run on a single privileged LXC container (12 cores, 24 GB RAM) usin
 
 | Container | Port | Purpose | Notes |
 |-----------|------|---------|-------|
-| **nginx-proxy** | 80, 443 | Reverse proxy | 34 subdomains on `*.homelab.internal`, self-signed wildcard cert (10-year) |
+| **nginx-proxy** | 80, 443 | Reverse proxy | 36 subdomains on `*.homelab.internal`, self-signed wildcard cert (10-year) |
 | **authelia** | 9091 | SSO identity provider | File-based auth, one-factor, session cookie for `.homelab.internal` |
 
 ### Infrastructure & Monitoring
@@ -152,4 +154,4 @@ API calls from the Homelab API / Agent use direct IP:port (bypassing nginx) — 
 
 - **autoheal** restarts containers with failing Docker health checks
 - **n8n workflows** monitor critical services (qBit, gluetun VPN, *arr apps)
-- **media-monitor agent** (on separate LXC) runs periodic health checks with LLM-assisted remediation
+- **Homelab Agent** (on LXC 100) runs periodic health checks every 5 min with 3-tier LLM-assisted remediation
