@@ -42,8 +42,12 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │   │   ├── Notifications (deduplication, resolved alerts, weekly digest)
 │   │   └── AI escalation (3-tier repair: 1.7b → 35b → Claude Code)
 │   ├── Ecosystem RAG (port 9103) — hybrid search across the whole homelab
+│   │   └── vectors stored in the Chroma container on LXC 200 (networked, not embedded)
 │   ├── Terraform status (port 9104) — IaC state API
 │   └── Temp API (port 9101) — hardware sensor data
+│
+├── Chroma vector DB (runs on LXC 200, port 8200)
+│   └── Standalone container (chromadb/chroma), persistent volume; serves the Ecosystem RAG
 │
 ├── SearXNG (runs on LXC 200, port 8888)
 │   ├── Connected to Open WebUI for AI web search

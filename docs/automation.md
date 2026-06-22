@@ -215,9 +215,9 @@ Active firewall-level IP blocking using community threat intelligence.
 Entire cluster defined as Terraform config using the bpg/proxmox provider.
 
 - **Location**: `/home/admin/terraform/` on AIServer
-- **State**: All 7 LXCs + LXC 200 + VM 103 imported
+- **State**: All AIServer LXCs + LXC 200 + VM 103 imported (`ignore_changes = all` — config is documentation/DR, it won't fight manual changes)
 - **Status API**: port 9104 on AIServer
-- **Purpose**: Disaster recovery — if a node dies, `terraform apply` recreates everything
+- **Scope (important):** Terraform recreates the **container/VM shells** (cores, memory, disk, hostname) — it does **not** reinstall software, restore data, or configure GPU passthrough / Tailscale. Full recovery is Terraform **+** restic **+** GitHub **+** a few manual steps. See **[Disaster Recovery](disaster-recovery.md)** for the full runbook.
 
 ---
 

@@ -192,6 +192,7 @@ See [AI Stack](docs/ai-stack.md) for full details.
 | [Game Pipeline](docs/game-pipeline.md) | Automated game download → install → Steam library pipeline |
 | [AI Stack](docs/ai-stack.md) | Tool-calling agent, Download Guardian, verification, diagnostics, RAG, SearXNG, Homelab Agent, nightly tests |
 | [Automation](docs/automation.md) | Download Guardian, Homelab Agent, backups, nightly tests, CrowdSec, Terraform, dual-channel alerts |
+| [Disaster Recovery](docs/disaster-recovery.md) | Full rebuild runbook — the four recovery layers (Terraform / restic / GitHub / manual), backup inventory, restore order, gaps |
 | [Monitoring](docs/monitoring.md) | Homelab Agent (7 modules, 3-tier AI repair), n8n watchdog workflows, Homepage dashboard, storage monitoring |
 | [Media Stack](docs/media-stack.md) | Jellyfin, *arr apps, download automation |
 | [Networking](docs/networking.md) | VPN, Cloudflare tunnel, Tailscale mesh, nginx + Authelia SSO |
