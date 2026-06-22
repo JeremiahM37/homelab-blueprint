@@ -127,23 +127,28 @@ Full endpoint list at `GET /`.
 
 ---
 
-## Document RAG
+## Ecosystem RAG
 
-Vector search over Paperless documents using local embeddings + LLM generation.
+Natural-language search across the whole homelab — documents, media catalogs, infra/config, notes, projects, git history, inventory — using local embeddings + LLM generation. See [AI Stack → Ecosystem RAG](ai-stack.md#ecosystem-rag) for the full design.
 
 - **Embedding**: nomic-embed-text (~275MB) on Ollama
-- **Generation**: qwen3:1.7b on Ollama
-- **Vector DB**: ChromaDB (persistent, on disk)
-- **Indexed**: 169 documents -> 11,357 chunks
+- **Generation**: a 35B-class instruct model for answers; a small model for query routing + rerank
+- **Vector DB**: ChromaDB (persistent, on disk) — single `ecosystem` collection
+- **Sources**: ~14 pluggable connectors; a source missing credentials disables itself cleanly
+- **Retrieval**: hybrid dense + BM25 fused with RRF, then LLM rerank; optional query routing
+- **Indexing**: incremental — a sqlite content-hash manifest means only new/changed docs re-embed; nightly systemd timer
 - **Port**: 9103 on AIServer
-- **Privacy**: NOT exposed via Discord — admin-only via API or direct access
+- **Privacy**: per-source visibility tiers (`public` / `lan` / `admin`); each surface (host API / MCP / Homepage `/chat` / Discord `*ask`) caps which tiers it can read, so personal data never reaches a public surface
 
 ### Usage
 ```bash
-# Ask a question
-curl "http://YOUR_AISERVER_IP:9103/api/ask?q=direct+deposit+info"
+# Ask a question (host API = full, admin-tier access)
+curl "http://YOUR_AISERVER_IP:9103/api/ask?q=which+services+run+behind+the+vpn"
 
-# Re-index after adding new Paperless docs
+# Streaming answer (SSE)
+curl "http://YOUR_AISERVER_IP:9103/api/ask/stream?q=..."
+
+# Re-index (incremental — only changed docs re-embed)
 curl -X POST http://YOUR_AISERVER_IP:9103/api/reindex
 ```
 

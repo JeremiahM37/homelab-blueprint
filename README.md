@@ -33,7 +33,7 @@ This repo documents the architecture, services, and lessons learned. No credenti
 │    system —      │  (USB TerraMaster)   │  │  └─ Download Guardian    │   │
 │    host goes     │                      │  │  └─ Library Verification │   │
 │    headless      │                      │  │  └─ Diagnostic Tools     │   │
-│    when VM runs  │                      │  │ Doc RAG         :9103    │   │
+│    when VM runs  │                      │  │ Ecosystem RAG   :9103    │   │
 │                  │                      │  │ Terraform       :9104    │   │
 │                  │                      │  └───────────────────────────┘   │
 ├──────────────────┴──────────────────────┴───────────────────────────────────┤
@@ -125,7 +125,7 @@ On top of the basic tool-calling loop, the stack adds:
 - **Episodic memory** — summaries of past conversations are embedded and retrieved on new messages, so context persists across sessions and interfaces
 - **LLM observability** — every Ollama call traced to SQLite with latency / token / tool-success metadata, visible in the PWA
 - **Code execution sandbox** — `execute_code` tool runs Python in a hardened bubblewrap namespace (no network, 5s CPU, 512MB RAM, fs-isolated)
-- **Unified homelab RAG** — ChromaDB ingest of Sonarr/Radarr/Jellyfin/git/agent-failures for "ask anything about my homelab"
+- **Ecosystem RAG** — one vector index over the whole homelab (docs, media, infra/compose, notes, projects, git, inventory) with hybrid dense+keyword retrieval, LLM rerank, incremental indexing, and per-source visibility tiers
 - **Tier 2 verify step** — after the smart fixer declares a fix, syntax/container-health/LLM-judge checks run; any failure reverts file edits from backups
 - **Eval harness** — canned prompts + LLM judge nightly, with a regression gate in the nightly test suite
 
@@ -212,7 +212,7 @@ See [AI Stack](docs/ai-stack.md) for full details.
 - **Episodic memory** — past chats are summarized + embedded + retrieved cross-interface, so the assistant remembers context between Discord, PWA, and Open WebUI sessions
 - **LLM observability** — SQLite trace of every Ollama call (latency/tokens/tool success/errors); real-time stats rendered on the mobile PWA
 - **Code execution sandbox** — Python/bash tool runs in a bubblewrap-isolated namespace (no network, fs-isolated, resource-capped, timeout-enforced)
-- **Unified homelab RAG** — ChromaDB ingest of Sonarr/Radarr/Jellyfin/git/agent-failures; natural-language queries against every source with `?source=` filter
+- **Ecosystem RAG** — ~14 pluggable source connectors (docs, media, infra/compose, Proxmox, notes, projects, git, inventory) into one collection; hybrid dense+BM25 retrieval with RRF + LLM rerank + query routing; incremental hash-based reindex; tiered visibility (`public`/`lan`/`admin`) gated per surface (host API / MCP / Homepage `/chat` / Discord `*ask`)
 - **Tier 2 verify step** — smart fixer's fixes are independently validated (syntax / container health / LLM judge); file edits auto-revert from backup on failure
 - **Eval harness** — 10 canned prompts replayed nightly with LLM judge scoring, SQLite history, regression gate in nightly tests
 - **4 agent interfaces** — Discord bot, Homepage chat widget, mobile PWA, Open WebUI (same brain, same tools)
@@ -225,7 +225,7 @@ See [AI Stack](docs/ai-stack.md) for full details.
 - **SearXNG** — self-hosted web search for AI agent, Homepage dashboard, Open WebUI
 - **Diagnostic toolkit** — file ops, log reading, permission fixes, library rescans for AI escalation
 - **Unified API** — single FastAPI endpoint aggregating all services (Swagger docs included)
-- **Document RAG** — vector search over 169+ documents via local embeddings + LLM
+- **Ecosystem RAG** — natural-language search across the entire homelab (Paperless docs, media catalogs, infra/config, notes, inventory) via local embeddings + LLM, with cited answers
 - **Automated backups** — Restic to DAS, 4 nodes, daily, encrypted, deduplicated
 - **SSO reverse proxy** — nginx + Authelia, 36 subdomains on `*.homelab.internal`, 3-tier auth (true SSO / gate / passthrough), self-signed wildcard cert, dnsmasq for LAN + Tailscale split DNS for remote
 - **CrowdSec IPS** — 1400+ malicious IPs blocked at firewall, community threat intel

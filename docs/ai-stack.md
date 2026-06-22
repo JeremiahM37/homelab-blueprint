@@ -41,7 +41,7 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │   │   ├── System monitor (DAS, disk forecasting, host load, container resources)
 │   │   ├── Notifications (deduplication, resolved alerts, weekly digest)
 │   │   └── AI escalation (3-tier repair: 1.7b → 35b → Claude Code)
-│   ├── Document RAG (port 9103) — vector search over Paperless docs
+│   ├── Ecosystem RAG (port 9103) — hybrid search across the whole homelab
 │   ├── Terraform status (port 9104) — IaC state API
 │   └── Temp API (port 9101) — hardware sensor data
 │
@@ -497,27 +497,36 @@ Chat conversations are summarized and embedded after each agent turn-pair. On a 
 
 ---
 
-## Unified Homelab RAG
+## Ecosystem RAG
 
-Extends `doc-rag` (Paperless-only previously) with a second Chroma collection (`homelab_unified`) that ingests Sonarr/Radarr/Jellyfin/homelab-agent-failures/git-commits. Each document carries a `source` metadata tag so queries can be filtered — "what movies do I have" with `?source=radarr` only returns movie data.
+`doc-rag` (originally Paperless-only) was rebuilt into a single **ecosystem-wide RAG**: one vector collection indexing the *whole* homelab, answering natural-language questions across all of it. FastAPI service, local embeddings + LLM, no cloud.
 
-**Ingest:** Nightly at 04:30 via systemd timer (`homelab-reindex.timer`). Each source is fetched independently so a single broken API can't take down the whole index. Fetchers are isolated — one raising an exception doesn't affect the others.
+**Connector framework.** Each source is a small pluggable connector that yields documents with a stable id + content hash. ~14 connectors across four domains:
+- **Knowledge & docs** — Paperless documents, project docs, homelab notes (SilverBullet)
+- **Media & libraries** — Sonarr, Radarr, Jellyfin, Audiobookshelf, Kavita
+- **Infra & ops** — docker-compose service definitions, Proxmox cluster resources, Prowlarr indexers, n8n workflows, git history, agent failure memory
+- **Home & life** — Mealie recipes, Homebox inventory, Linkwarden bookmarks, changedetection watches
 
-**Sources:**
-- **Sonarr**: all series with monitored state + episodes-missing count
-- **Radarr**: all movies with has-file/monitored state
-- **Jellyfin**: library items (movies/shows/audiobooks) with overview + genres
-- **Agent failures**: SQLite rows from homelab-agent's failure memory
-- **Git commits**: last 200 commits across `librarr-go`, `homelab-agent`, `homelab-api`, `doc-rag`
+A source missing credentials disables itself cleanly rather than breaking the run.
 
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /api/homelab/ask?q=&source=` | RAG answer, optionally filtered by source |
-| `GET /api/homelab/search?q=&source=` | Raw vector-similarity results |
-| `POST /api/homelab/reindex` | Full rebuild (pull + embed all sources) |
-| `GET /api/homelab/status` | Indexed chunk count, per-source counts, last sync timestamp |
+**Hybrid retrieval.** Dense vectors (nomic-embed-text) + BM25 keyword search are fused with Reciprocal Rank Fusion, then an LLM rerank pass selects the final context; an optional query router narrows to the likely sources with a safe "search-everything" fallback. Answers cite their sources inline as `[n]`.
 
-Example: `/api/homelab/ask?q=what+movies+do+I+have&source=radarr` returns a real answer backed by actual Radarr inventory.
+**Incremental indexing.** A sqlite manifest stores each document's content hash, so a reindex only re-embeds new or changed documents and prunes deleted ones (cold build of a few hundred docs in seconds; warm re-runs in well under a second). Nightly rebuild via systemd timer; one broken source can't abort the run.
+
+**Visibility tiers (privacy).** Every connector declares a tier — `public`, `lan`, or `admin` — and every access surface caps which tiers it may read. Personal data (documents, notes, inventory, recipes) is `admin`-only and never reaches a less-trusted surface.
+
+**Four surfaces, tier-gated:**
+
+| Surface | Tier cap | How |
+|---------|----------|-----|
+| Host HTTP API | admin | `/api/ask`, `/api/ask/stream` (SSE), `/api/search`, `/api/status`, `/api/sources`, `POST /api/reindex` |
+| MCP server | admin | tools (`ecosystem_ask` / `search` / `sources` / `status`) for Claude / Open-WebUI |
+| Homepage widget | lan | self-contained streaming chat UI at `/chat` |
+| Discord | public | `*ask <question>` — public sources only |
+
+The previous `/api/homelab/*` endpoints remain as backward-compatible aliases.
+
+Example: "which containers run behind the VPN gateway and why" returns a cited answer drawn from the compose definitions and homelab notes; the same question asked over Discord only ever sees public-tier sources.
 
 ---
 
