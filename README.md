@@ -197,6 +197,8 @@ See [AI Stack](docs/ai-stack.md) for full details.
 | [Media Stack](docs/media-stack.md) | Jellyfin, *arr apps, download automation |
 | [Networking](docs/networking.md) | VPN, Cloudflare tunnel, Tailscale mesh, nginx + Authelia SSO |
 | [Lessons Learned](docs/lessons-learned.md) | Gotchas, debugging tips, things that broke |
+| [Terraform IaC](terraform/) | LXC/VM shell provisioning (bpg/proxmox); in-guest convergence is Ansible's job |
+| [Ansible](ansible/) | In-guest software/config convergence (roles, inventory, playbook) |
 | [Docker Compose (example)](docker-compose.example.yml) | Sanitized compose file |
 
 ---
@@ -230,7 +232,7 @@ See [AI Stack](docs/ai-stack.md) for full details.
 - **Automated backups** — Restic to DAS, 4 nodes, daily, encrypted, deduplicated
 - **SSO reverse proxy** — nginx + Authelia, 36 subdomains on `*.homelab.internal`, 3-tier auth (true SSO / gate / passthrough), self-signed wildcard cert, dnsmasq for LAN + Tailscale split DNS for remote
 - **CrowdSec IPS** — 1400+ malicious IPs blocked at firewall, community threat intel
-- **Terraform IaC** — entire cluster defined as code, importable state
+- **Terraform IaC** — cluster LXC/VM shells defined as code ([`terraform/`](terraform), bpg/proxmox provider, importable state); in-guest convergence is Ansible's job
 - **9 n8n workflows** — dual-channel Discord alerts, watchdogs, health checks
 - **AI self-healing** — consolidated Homelab Agent with 3-tier repair (1.7b fast tools → 35b smart fixer → Claude Code backstop) auto-fixes containers, torrents, VPN, permissions, imports, configs
 - **Dual-channel Discord alerts** — all watchdogs and bots report to both Discord servers

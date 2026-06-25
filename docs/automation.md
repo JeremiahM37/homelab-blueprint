@@ -212,12 +212,12 @@ Active firewall-level IP blocking using community threat intelligence.
 
 ## Terraform (Infrastructure as Code)
 
-Entire cluster defined as Terraform config using the bpg/proxmox provider.
+Cluster LXC/VM shells defined as Terraform config using the bpg/proxmox provider.
 
-- **Location**: `/home/admin/terraform/` on AIServer
+- **Location**: [`terraform/`](../terraform) in this repo (sanitized copy of the live config that runs from `/home/admin/terraform/` on AIServer)
 - **State**: All AIServer LXCs + LXC 200 + VM 103 imported (`ignore_changes = all` — config is documentation/DR, it won't fight manual changes)
 - **Status API**: port 9104 on AIServer
-- **Scope (important):** Terraform recreates the **container/VM shells** (cores, memory, disk, hostname) — it does **not** reinstall software, restore data, or configure GPU passthrough / Tailscale. Full recovery is Terraform **+** restic **+** GitHub **+** a few manual steps. See **[Disaster Recovery](disaster-recovery.md)** for the full runbook.
+- **Scope (important):** Terraform recreates the **container/VM shells** (cores, memory, disk, hostname) — it does **not** reinstall software, restore data, or configure GPU passthrough / Tailscale. That in-guest convergence is **Ansible**'s job (see [`ansible/`](../ansible)). Full recovery is Terraform **+** Ansible **+** restic **+** GitHub **+** a few manual steps. See **[Disaster Recovery](disaster-recovery.md)** for the full runbook.
 
 ---
 

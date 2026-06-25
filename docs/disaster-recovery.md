@@ -8,7 +8,7 @@ each own a different slice. Knowing which layer owns what is the whole game.
 
 | Layer | Recovers | Does **not** recover |
 |-------|----------|----------------------|
-| **Terraform** (`/home/admin/terraform/`) | Container/VM **shells** — cores, memory, disk, hostname, on the right node | Installed software, app data, GPU passthrough, Tailscale, anything *inside* the guest |
+| **Terraform** ([`terraform/`](../terraform)) | Container/VM **shells** — cores, memory, disk, hostname, on the right node | Installed software, app data, GPU passthrough, Tailscale, anything *inside* the guest (→ Ansible) |
 | **restic** (`/mnt/storage/backups/homelab`) | Data + configs — `/home/admin`, `/opt/docker` (incl. the Chroma vector DB), `/etc/pve`, systemd units, LXC configs | Bulk media (excluded by design), caches/logs |
 | **GitHub** | All open-source project code (librarr, gamarr, sentinel, homelab-ai, …) | Local-only uncommitted work — commit/push regularly |
 | **Manual** | GPU passthrough lines, Tailscale auth, Ollama model pulls, app start | — (documented below) |
@@ -30,7 +30,7 @@ each own a different slice. Knowing which layer owns what is the whole game.
 ## Restore runbook (full rebuild, in order)
 
 1. **Proxmox nodes** — reinstall Proxmox; restore `/etc/pve`, network config, and (for the gaming node) GRUB/VFIO/modprobe from the restic `pve`/`mediaserver-host` snapshots.
-2. **Container shells** — `cd /home/admin/terraform && terraform apply` to recreate the LXC/VM shells. (Or `pct restore` from a vzdump archive if you have one — faster for a single guest.)
+2. **Container shells** — `cd terraform && terraform init && terraform apply` to recreate the LXC/VM shells (the config lives in [`terraform/`](../terraform) in this repo). (Or `pct restore` from a vzdump archive if you have one — faster for a single guest.)
 3. **Data + configs** — `restic restore <snapshot> --target /` per guest/host to repopulate `/home/admin`, `/opt/docker`, etc.
 4. **Bring services up:**
    - LXC 200: `cd /opt/docker && docker compose up -d` (restores all containers incl. Chroma).

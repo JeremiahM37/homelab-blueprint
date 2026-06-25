@@ -1,0 +1,16 @@
+# Copy to terraform.tfvars and fill in your own values.
+# terraform.tfvars is gitignored — NEVER commit real tokens or passwords.
+
+# Proxmox API endpoint. Use any cluster member that is always-on
+# (the cluster API answers from any node). Example:
+proxmox_endpoint = "https://192.168.1.30:8006"
+
+# Proxmox API token in the form "user@realm!tokenid=uuid".
+# Create one in the Proxmox UI: Datacenter > Permissions > API Tokens.
+proxmox_api_token = "terraform@pve!iac=00000000-0000-0000-0000-000000000000"
+
+# Root/admin password used for container initialization.
+root_password = "change-me"
+
+# Public key injected into containers on first init (optional).
+ssh_public_key = "ssh-ed25519 AAAA... you@example.com"

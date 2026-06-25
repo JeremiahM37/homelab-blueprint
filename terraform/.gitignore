@@ -1,0 +1,15 @@
+# Terraform state — may contain secrets, never commit
+*.tfstate
+*.tfstate.*
+
+# Variable files with real secrets — keep the .example, ignore the rest
+*.tfvars
+!*.tfvars.example
+
+# Provider plugins / local working dir
+.terraform/
+.terraform.tfstate.lock.info
+
+# Crash logs
+crash.log
+crash.*.log
