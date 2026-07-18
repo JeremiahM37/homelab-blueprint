@@ -1,0 +1,5 @@
+---
+# Ansible collection requirements.
+# Install with: ansible-galaxy collection install -r requirements.yml
+collections:
+  - name: community.general  # community.general.timezone (roles/common)
