@@ -4,6 +4,10 @@ A three-node Proxmox cluster running media automation, gaming (with GPU passthro
 
 This repo documents the architecture, services, and lessons learned. No credentials or personal info — just the blueprint.
 
+> **Want to build this yourself?** Start with **[docs/RECREATE.md](docs/RECREATE.md)** —
+> the ordered runbook from bare Proxmox hardware to the full running stack
+> (Proxmox prep → Terraform → Ansible → Docker Compose → verification).
+
 ---
 
 ## Cluster Overview
@@ -191,6 +195,7 @@ See [AI Stack](docs/ai-stack.md) for full details.
 
 | Doc | Description |
 |-----|-------------|
+| [**Recreate the Stack**](docs/RECREATE.md) | **Ordered rebuild runbook** — Proxmox prep, Terraform, Ansible, compose bring-up, all required secrets, verification checklist |
 | [Docker Services](docs/docker-services.md) | All 55+ containers running on LXC 200 |
 | [Gaming VM](docs/gaming-vm.md) | Bazzite setup, GPU passthrough, Sunshine/Moonlight streaming |
 | [Game Pipeline](docs/game-pipeline.md) | Automated game download → install → Steam library pipeline |
