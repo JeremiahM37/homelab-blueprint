@@ -1,5 +1,7 @@
 # Docker Compose — Homelab Media & Services Stack
-# Sanitized example — replace all <PLACEHOLDER> values with your own
+# Sanitized example — secrets come from a .env file in the same directory.
+#   Manual bring-up: cp .env.example .env, fill in your values, then
+#   `docker compose up -d`. The Ansible docker-host role generates .env for you.
 #
 # Run on a dedicated Docker host (LXC or VM) with:
 #   - 12+ cores, 24+ GB RAM recommended
@@ -25,9 +27,9 @@ services:
     environment:
       - VPN_SERVICE_PROVIDER=mullvad
       - VPN_TYPE=wireguard
-      - WIREGUARD_PRIVATE_KEY=<YOUR_VPN_PRIVATE_KEY>
-      - WIREGUARD_ADDRESSES=<YOUR_VPN_ADDRESS>/32
-      - SERVER_COUNTRIES=<YOUR_PREFERRED_COUNTRY>
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
+      - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
+      - SERVER_COUNTRIES=${SERVER_COUNTRIES}
     ports:
       # Ports for containers using gluetun's network
       - "8080:8080"    # qBittorrent
@@ -48,7 +50,7 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=<YOUR_TIMEZONE>
+      - TZ=${TZ}
     volumes:
       - ./qbittorrent:/config
       - /data/media:/data/media
@@ -61,9 +63,9 @@ services:
     container_name: unpackerr
     environment:
       - UN_SONARR_0_URL=http://sonarr:8989
-      - UN_SONARR_0_API_KEY=<SONARR_API_KEY>
+      - UN_SONARR_0_API_KEY=${SONARR_API_KEY}
       - UN_RADARR_0_URL=http://radarr:7878
-      - UN_RADARR_0_API_KEY=<RADARR_API_KEY>
+      - UN_RADARR_0_API_KEY=${RADARR_API_KEY}
     volumes:
       - /data/media:/data/media
     networks:
@@ -89,7 +91,7 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=<YOUR_TIMEZONE>
+      - TZ=${TZ}
     volumes:
       - ./prowlarr:/config
     ports:
@@ -105,7 +107,7 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=<YOUR_TIMEZONE>
+      - TZ=${TZ}
     volumes:
       - ./sonarr:/config
       - /data/media:/data/media
@@ -122,7 +124,7 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=<YOUR_TIMEZONE>
+      - TZ=${TZ}
     volumes:
       - ./radarr:/config
       - /data/media:/data/media
@@ -139,7 +141,7 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=<YOUR_TIMEZONE>
+      - TZ=${TZ}
     volumes:
       - ./bazarr:/config
       - /data/media:/data/media
@@ -154,7 +156,7 @@ services:
     image: fallenbagel/jellyseerr:latest
     container_name: jellyseerr
     environment:
-      - TZ=<YOUR_TIMEZONE>
+      - TZ=${TZ}
     volumes:
       - ./jellyseerr:/app/config
     ports:
@@ -173,7 +175,7 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=<YOUR_TIMEZONE>
+      - TZ=${TZ}
     volumes:
       - ./jellyfin:/config
       - /data/media:/data/media
@@ -191,7 +193,7 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=<YOUR_TIMEZONE>
+      - TZ=${TZ}
     volumes:
       - ./tdarr/server:/app/server
       - ./tdarr/configs:/app/configs
@@ -229,7 +231,7 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=<YOUR_TIMEZONE>
+      - TZ=${TZ}
     volumes:
       - ./calibre-web:/config
       - /data/media/books/ebooks:/books
@@ -274,14 +276,14 @@ services:
     network_mode: "service:gluetun"
     environment:
       - PROWLARR_URL=http://prowlarr:9696
-      - PROWLARR_API_KEY=<YOUR_PROWLARR_API_KEY>
+      - PROWLARR_API_KEY=${PROWLARR_API_KEY}
       - QB_URL=http://localhost:8080
-      - QB_USER=<QBIT_USER>
-      - QB_PASS=<QBIT_PASSWORD>
+      - QB_USER=${QBIT_USER}
+      - QB_PASS=${QBIT_PASS}
       - DB_PATH=/data/librarr.db
-      - AUTH_USERNAME=<LIBRARR_USER>
-      - AUTH_PASSWORD=<LIBRARR_PASSWORD>
-      - TORZNAB_API_KEY=<YOUR_TORZNAB_API_KEY>
+      - AUTH_USERNAME=${LIBRARR_USER}
+      - AUTH_PASSWORD=${LIBRARR_PASS}
+      - TORZNAB_API_KEY=${TORZNAB_API_KEY}
     volumes:
       - ./librarr-go/data:/data
       - /data/media/books/ebooks/incoming:/books-incoming
@@ -297,24 +299,24 @@ services:
     container_name: sentinel
     environment:
       - JELLYSEERR_URL=http://jellyseerr:5055
-      - JELLYSEERR_API_KEY=<YOUR_JELLYSEERR_API_KEY>
+      - JELLYSEERR_API_KEY=${JELLYSEERR_API_KEY}
       - JELLYFIN_URL=http://jellyfin:8096
-      - JELLYFIN_API_KEY=<YOUR_JELLYFIN_API_KEY>
+      - JELLYFIN_API_KEY=${JELLYFIN_API_KEY}
       - PROWLARR_URL=http://prowlarr:9696
-      - PROWLARR_API_KEY=<YOUR_PROWLARR_API_KEY>
+      - PROWLARR_API_KEY=${PROWLARR_API_KEY}
       - QBITTORRENT_URL=http://gluetun:8080
-      - QBITTORRENT_USER=<QBIT_USER>
-      - QBITTORRENT_PASS=<QBIT_PASSWORD>
+      - QBITTORRENT_USER=${QBIT_USER}
+      - QBITTORRENT_PASS=${QBIT_PASS}
       - AUDIOBOOKSHELF_URL=http://audiobookshelf:80
-      - AUDIOBOOKSHELF_TOKEN=<YOUR_ABS_TOKEN>
+      - AUDIOBOOKSHELF_TOKEN=${ABS_TOKEN}
       - KAVITA_URL=http://kavita:5000
-      - KAVITA_API_KEY=<YOUR_KAVITA_API_KEY>
+      - KAVITA_API_KEY=${KAVITA_API_KEY}
       - SONARR_URL=http://sonarr:8989
-      - SONARR_API_KEY=<YOUR_SONARR_API_KEY>
+      - SONARR_API_KEY=${SONARR_API_KEY}
       - RADARR_URL=http://radarr:7878
-      - RADARR_API_KEY=<YOUR_RADARR_API_KEY>
+      - RADARR_API_KEY=${RADARR_API_KEY}
       - SENTINEL_DB_PATH=/data/sentinel.db
-      - DISCORD_WEBHOOK_URL=<YOUR_DISCORD_WEBHOOK_URL>
+      - DISCORD_WEBHOOK_URL=${SENTINEL_DISCORD_WEBHOOK}
     volumes:
       - ./sentinel/data:/data
     ports:
@@ -344,8 +346,8 @@ services:
     container_name: gamevault-backend
     environment:
       - DB_HOST=gamevault-db
-      - DB_USERNAME=<DB_USER>
-      - DB_PASSWORD=<DB_PASSWORD>
+      - DB_USERNAME=${DB_USER}
+      - DB_PASSWORD=${DB_PASS}
     volumes:
       - /data/media/games/vault:/files
     ports:
@@ -361,8 +363,8 @@ services:
     image: postgres:16-alpine
     container_name: gamevault-db
     environment:
-      - POSTGRES_USER=<DB_USER>
-      - POSTGRES_PASSWORD=<DB_PASSWORD>
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASS}
       - POSTGRES_DB=gamevault
     volumes:
       - ./gamevault-db:/var/lib/postgresql/data
@@ -376,8 +378,8 @@ services:
     environment:
       - DB_HOST=romm-db
       - DB_NAME=romm
-      - DB_USER=<DB_USER>
-      - DB_PASSWD=<DB_PASSWORD>
+      - DB_USER=${DB_USER}
+      - DB_PASSWD=${DB_PASS}
     volumes:
       - ./romm/resources:/romm/resources
       - ./romm/redis:/redis-data
@@ -395,10 +397,10 @@ services:
     image: mariadb:lts
     container_name: romm-db
     environment:
-      - MYSQL_ROOT_PASSWORD=<DB_ROOT_PASSWORD>
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASS}
       - MYSQL_DATABASE=romm
-      - MYSQL_USER=<DB_USER>
-      - MYSQL_PASSWORD=<DB_PASSWORD>
+      - MYSQL_USER=${DB_USER}
+      - MYSQL_PASSWORD=${DB_PASS}
     volumes:
       - ./romm-db:/var/lib/mysql
     networks:
@@ -414,7 +416,7 @@ services:
     container_name: paperless
     environment:
       - PAPERLESS_REDIS=redis://paperless-redis:6379
-      - PAPERLESS_SECRET_KEY=<RANDOM_SECRET>
+      - PAPERLESS_SECRET_KEY=${PAPERLESS_SECRET}
       - USERMAP_UID=1000
       - USERMAP_GID=1000
     volumes:
@@ -463,8 +465,8 @@ services:
     image: ghcr.io/linkwarden/linkwarden:latest
     container_name: linkwarden
     environment:
-      - DATABASE_URL=postgresql://<DB_USER>:<DB_PASSWORD>@linkwarden-db:5432/linkwarden
-      - NEXTAUTH_SECRET=<RANDOM_SECRET>
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@linkwarden-db:5432/linkwarden
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=http://localhost:3050
     volumes:
       - ./linkwarden:/data/data
@@ -481,8 +483,8 @@ services:
     image: postgres:16-alpine
     container_name: linkwarden-db
     environment:
-      - POSTGRES_USER=<DB_USER>
-      - POSTGRES_PASSWORD=<DB_PASSWORD>
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASS}
       - POSTGRES_DB=linkwarden
     volumes:
       - ./linkwarden-db:/var/lib/postgresql/data
@@ -579,8 +581,8 @@ services:
     container_name: n8n
     environment:
       - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=<N8N_USER>
-      - N8N_BASIC_AUTH_PASSWORD=<N8N_PASSWORD>
+      - N8N_BASIC_AUTH_USER=${N8N_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASS}
     volumes:
       - ./n8n:/home/node/.n8n
       - /usr/bin/docker:/usr/local/bin/docker:ro
@@ -693,7 +695,7 @@ services:
     container_name: cloudflared
     command: tunnel run
     environment:
-      - TUNNEL_TOKEN=<YOUR_CLOUDFLARE_TUNNEL_TOKEN>
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
     networks:
       - proxy
     restart: unless-stopped
@@ -711,7 +713,7 @@ services:
     image: your-discord-bot:latest
     container_name: discord-bot
     environment:
-      - DISCORD_TOKEN=<YOUR_DISCORD_BOT_TOKEN>
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
     ports:
       - "3003:3003"
     networks:

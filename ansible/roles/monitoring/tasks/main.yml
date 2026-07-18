@@ -62,8 +62,16 @@
           networks:
             - internal
           restart: unless-stopped
-    insertbefore: "^$"
+    # Appended at EOF — the compose file ends inside the services: map, so the
+    # two-space indented block lands at service level. (insertbefore: "^$"
+    # would splice the block into the first blank line and corrupt the file.)
   when: monitoring_compose_file.stat.exists
+
+- name: Create Grafana provisioning directory
+  ansible.builtin.file:
+    path: "{{ docker_compose_dir }}/grafana/provisioning/datasources"
+    state: directory
+    mode: "0755"
 
 - name: Configure Grafana Loki datasource
   ansible.builtin.copy:
@@ -87,10 +95,3 @@
   args:
     executable: /bin/bash
   changed_when: false
-
-- name: Create Grafana provisioning directory
-  ansible.builtin.file:
-    path: "{{ docker_compose_dir }}/grafana/provisioning/datasources"
-    state: directory
-    mode: "0755"
-    recurse: true

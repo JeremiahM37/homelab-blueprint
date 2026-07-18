@@ -52,6 +52,35 @@
     state: directory
     mode: "0755"
 
+# The DAS is bind-mounted into the container at /mnt/storage (mp0).
+# All service paths use {{ media_data_path }} (/data/media), which is a
+# symlink to /mnt/storage/media — create both ends before the media dirs.
+- name: Ensure DAS media root exists
+  ansible.builtin.file:
+    path: /mnt/storage/media
+    state: directory
+    owner: "{{ docker_puid }}"
+    group: "{{ docker_pgid }}"
+    mode: "0775"
+
+- name: Ensure parent directory of media path exists
+  ansible.builtin.file:
+    path: "{{ media_data_path | dirname }}"
+    state: directory
+    mode: "0755"
+
+- name: Check current state of media path
+  ansible.builtin.stat:
+    path: "{{ media_data_path }}"
+  register: media_path_stat
+
+- name: Symlink media path to DAS media root
+  ansible.builtin.file:
+    src: /mnt/storage/media
+    dest: "{{ media_data_path }}"
+    state: link
+  when: not media_path_stat.stat.exists
+
 - name: Create media directories
   ansible.builtin.file:
     path: "{{ item }}"

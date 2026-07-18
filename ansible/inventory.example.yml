@@ -11,10 +11,22 @@ all:
     # --- Domain ---
     homelab_domain: "homelab.internal"
 
+    # --- Network ---
+    lan_gateway: "YOUR_GATEWAY_IP"         # e.g. 192.168.1.1
+
+    # Optional: SSH public key(s) written to /root/.ssh/authorized_keys on all
+    # Proxmox nodes by the common role. One key per line.
+    # ssh_authorized_keys: |
+    #   ssh-ed25519 AAAA... you@example.com
+
     # --- Docker host (LXC 200) ---
     docker_host_ip: "YOUR_DOCKER_HOST_IP"  # e.g. 192.168.1.222
     docker_compose_dir: "/opt/docker"
     media_data_path: "/data/media"
+
+    # LXC IPs default to DHCP (see group_vars/all.yml lxc_containers).
+    # LXC 200 gets a static IP from docker_host_ip above; LXC 103 (valheim)
+    # has a static example IP in group_vars — change it to fit your subnet.
 
     # --- VPN ---
     vpn_provider: "mullvad"

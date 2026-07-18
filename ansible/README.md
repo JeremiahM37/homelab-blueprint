@@ -2,15 +2,21 @@
 
 Deploy the entire homelab stack on fresh Proxmox hardware. This playbook creates LXC containers, installs Docker with 55+ services, configures GPU passthrough, sets up SSO, centralized logging, automated backups, and AI/ML workloads.
 
+> **Rebuilding from scratch?** Follow the ordered end-to-end runbook in
+> [docs/RECREATE.md](../docs/RECREATE.md) — it covers Proxmox prep, Terraform,
+> this playbook, and the Docker bring-up in sequence.
+
 ## Prerequisites
 
-- **3 Proxmox VE nodes** installed and accessible via SSH
-- **Network**: All nodes on the same LAN subnet, static IPs assigned
+- **Proxmox VE nodes** installed and accessible via SSH as root (key-based —
+  copy your key with `ssh-copy-id root@<node>` first; `ansible.cfg` already
+  enables privilege escalation for non-root hosts)
+- **Network**: All nodes on the same LAN subnet, static IPs or DHCP reservations
 - **Storage**: DAS mounted on MediaServer at `/mnt/storage` (for media + backups)
 - **Ansible**: Install on your control machine:
   ```bash
-  pip install ansible
-  ansible-galaxy collection install community.general
+  pip install ansible-core
+  ansible-galaxy collection install -r requirements.yml
   ```
 
 ## Setup
