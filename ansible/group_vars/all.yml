@@ -77,11 +77,12 @@ lxc_containers:
     node: "mediaserver"
     cores: 12
     memory: 24576  # MB
-    disk: "100G"
+    disk: "400G"
+    swap: 4096
     ip: "{{ docker_host_ip }}/24"
     gateway: ""    # fill in inventory
     template: "debian-12-standard_12.7-1_amd64.tar.zst"
-    privileged: true
+    privileged: false
     features: "nesting=1"
     mountpoints:
       mp0: "/mnt/storage/media,mp=/data/media"
@@ -91,6 +92,7 @@ lxc_containers:
     cores: 4
     memory: 8192
     disk: "20G"
+    swap: 512
     ip: ""         # fill in inventory
     gateway: ""
     template: "debian-12-standard_12.7-1_amd64.tar.zst"
@@ -101,6 +103,7 @@ lxc_containers:
     cores: 4
     memory: 4096
     disk: "30G"
+    swap: 512
     ip: ""         # fill in inventory
     gateway: ""
     template: "debian-12-standard_12.7-1_amd64.tar.zst"
@@ -112,6 +115,7 @@ lxc_containers:
     cores: 16
     memory: 28672
     disk: "100G"
+    swap: 512
     ip: ""
     gateway: ""
     template: "debian-12-standard_12.7-1_amd64.tar.zst"
@@ -122,7 +126,8 @@ lxc_containers:
     node: "aiserver"
     cores: 4
     memory: 4096
-    disk: "16G"
+    disk: "400G"
+    swap: 4096
     ip: ""
     gateway: ""
     template: "debian-12-standard_12.7-1_amd64.tar.zst"
@@ -133,7 +138,8 @@ lxc_containers:
     node: "aiserver"
     cores: 16
     memory: 16384
-    disk: "50G"
+    disk: "124G"
+    swap: 512
     ip: ""
     gateway: ""
     template: "debian-12-standard_12.7-1_amd64.tar.zst"

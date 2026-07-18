@@ -178,7 +178,7 @@ See [AI Stack](docs/ai-stack.md) for full details.
 | 102 | openclaw | AIServer | LXC | 16c / 28 GB | Local LLM chat (Ollama + Open-WebUI) |
 | 103 | gaming-bazzite | pve | VM | 7c / 24 GB | Gaming VM with GPU passthrough |
 | 104 | work-env | AIServer | LXC | 4c / 4 GB | Claude Code, Docker, dev tools |
-| 105 | research-env | AIServer | LXC | 16c / 32 GB | AI/ML research with GPU passthrough (gfx1151, PyTorch ROCm) |
+| 105 | research-env | AIServer | LXC | 16c / 16 GB | AI/ML research with GPU passthrough (gfx1151, PyTorch ROCm) |
 | 200 | docker-server | MediaServer | LXC | 12c / 24 GB | Main Docker host (57+ containers) |
 
 ---

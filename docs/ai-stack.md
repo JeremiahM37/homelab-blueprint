@@ -66,7 +66,7 @@ The Radeon 8060S on Strix Halo uses **GTT (Graphics Translation Table) memory** 
 - `qwen3.5:35b-a3b`: 34.5 GB on GPU, ~22 ms/token
 - `qwen3:1.7b`: 6.2 GB on GPU, ~8 ms/token
 - Models run **fully GPU-accelerated** via GTT, not CPU-only
-- Shared across LXCs 102, 105, 106 via /dev/dri + /dev/kfd passthrough
+- Shared across LXCs 102 and 105 via /dev/dri + /dev/kfd passthrough
 - Not exclusive like RTX 2070 on pve (fully owned by VM 103)
 
 ---
@@ -458,7 +458,7 @@ pip install torch --index-url https://rocm.nightlies.amd.com/v2/gfx1151/
 - Python 3.11 with full scientific stack (numpy, scipy, pandas, matplotlib, scikit-learn)
 - PyTorch 2.9+ with ROCm 7.12
 - Triton 3.5+ for kernel compilation
-- 48 GB RAM, 32 vCPUs
+- 16 GB RAM, 16 vCPUs
 
 ---
 

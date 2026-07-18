@@ -26,6 +26,7 @@
       --hostname {{ item.value.hostname }} \
       --cores {{ item.value.cores }} \
       --memory {{ item.value.memory }} \
+      --swap {{ item.value.swap | default(512) }} \
       --rootfs {{ lxc_disk_storage }}:{{ item.value.disk }} \
       --net0 name=eth0,bridge={{ lxc_network_bridge }},ip={{ item.value.ip }},gw={{ item.value.gateway }} \
       {% if item.value.privileged | default(false) %}--unprivileged 0{% else %}--unprivileged 1{% endif %} \
