@@ -13,7 +13,7 @@ A custom Discord bot (`discord-bot` container, port 3003) with a local LLM-power
 ```
 Discord message
   → *ai <anything>
-  → qwen3:1.7b on Ollama (LXC 102, AMD iGPU) — intent parsing
+  → qwen3.5:4b on Ollama (LXC 102, AMD iGPU) — intent parsing
   → Route to /api/ai/agent (tool-calling agent)
   → qwen3.5:35b-a3b decides which tools to call
   → Execute against homelab APIs
@@ -24,7 +24,7 @@ Discord message
 - Intent parsing: **<1 second** (think mode disabled)
 - Tool-calling agent: 2-10 seconds depending on tool chain complexity
 - System prompt: ~1,141 tokens, 70+ tools
-- Model: qwen3:1.7b (~1.4GB) for intent, qwen3.5:35b-a3b (23GB) for agent
+- Model: qwen3.5:4b (~1.4GB) for intent, qwen3.5:35b-a3b (23GB) for agent
 - Cost: **$0** (local inference)
 
 ### Supported Actions

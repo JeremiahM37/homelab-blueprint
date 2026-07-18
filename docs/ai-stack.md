@@ -12,9 +12,9 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 ├── LXC 102 — "openclaw" (28 GB — LLM Chat)
 │   ├── Ollama (model serving, 2min idle timeout)
 │   │   ├── qwen3.5:35b-a3b (34.5 GB on GPU, chat + tool calling)
-│   │   ├── qwen3:1.7b (6.2 GB on GPU, intent parsing + Tier 1 repairs)
+│   │   ├── qwen3.5:4b (3.4 GB on GPU, intent parsing + Tier 1 repairs)
 │   │   ├── nomic-embed-text (275 MB, document RAG embeddings)
-│   │   └── qwen3:4b, qwen3:0.6b (available, not active)
+│   │   └── gemma4:e4b (9.6 GB on GPU, agent default for chat + episodic summarizer)
 │   ├── Open-WebUI (chat interface, port 8080)
 │   │   └── SearXNG integration (AI web search)
 │   │   └── MCP tools (Proxmox + Homelab management)
@@ -40,7 +40,7 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │   │   ├── Torrent doctor (qBit health, VPN stalls, dead torrent replacement, game auto-organize)
 │   │   ├── System monitor (DAS, disk forecasting, host load, container resources)
 │   │   ├── Notifications (deduplication, resolved alerts, weekly digest)
-│   │   └── AI escalation (3-tier repair: 1.7b → 35b → Claude Code)
+│   │   └── AI escalation (3-tier repair: 4b → 35b → Claude Code)
 │   ├── Ecosystem RAG (port 9103) — hybrid search across the whole homelab
 │   │   └── vectors stored in the Chroma container on LXC 200 (networked, not embedded)
 │   ├── Terraform status (port 9104) — IaC state API
@@ -64,9 +64,9 @@ The Radeon 8060S on Strix Halo uses **GTT (Graphics Translation Table) memory** 
 
 - **61.7 GB GTT available** — both active models load entirely into GPU memory
 - `qwen3.5:35b-a3b`: 34.5 GB on GPU, ~22 ms/token
-- `qwen3:1.7b`: 6.2 GB on GPU, ~8 ms/token
+- `qwen3.5:4b`: 3.4 GB on GPU, ~8 ms/token
 - Models run **fully GPU-accelerated** via GTT, not CPU-only
-- Shared across LXCs 102, 105, 106 via /dev/dri + /dev/kfd passthrough
+- Shared across LXCs 102 and 105 via /dev/dri + /dev/kfd passthrough
 - Not exclusive like RTX 2070 on pve (fully owned by VM 103)
 
 ---
@@ -79,15 +79,15 @@ The `/api/ai/agent` endpoint is a full tool-calling agent — not just a chat wr
 
 ```
 User message (any interface)
-  └── qwen3:1.7b intent classifier
-        ├── "chat" → qwen3:1.7b generates simple response (~8ms/token)
-        └── "action" → qwen3:1.7b tool calling (70+ tools, sub-second parsing)
+  └── qwen3.5:4b intent classifier
+        ├── "chat" → qwen3.5:4b generates simple response (~8ms/token)
+        └── "action" → qwen3.5:4b tool calling (70+ tools, sub-second parsing)
               └── Execute tool calls against homelab APIs
                     └── Feed results back to LLM
                           └── Generate response (or make more tool calls)
 
 Homelab Agent detects issue
-  └── Tier 1: qwen3:1.7b tries agent tools (fast, <1 second)
+  └── Tier 1: qwen3.5:4b tries agent tools (fast, <1 second)
         └── fails → Tier 2: qwen3.5:35b-a3b smart fixer (think: true, 19 tools)
               └── fails → Tier 3: writes fix-request.md → Claude Code (every 5 hours)
 ```
@@ -98,7 +98,7 @@ The same agent brain powers three interfaces:
 
 | Interface | Access | Notes |
 |-----------|--------|-------|
-| **Discord bot** | `*ai <anything>` in Discord | Sub-second intent parsing via qwen3:1.7b, then routes to agent |
+| **Discord bot** | `*ai <anything>` in Discord | Sub-second intent parsing via qwen3.5:4b, then routes to agent |
 | **Homepage chat widget** | Floating bubble on dashboard | Custom JS/CSS with tool-call progress indicators |
 | **Mobile PWA** | `/app` endpoint | AI chat with 120s timeout for mobile use |
 | **Open WebUI** | MCP tools via mcpo proxy | Full chat UI with conversation history |
@@ -132,9 +132,9 @@ The same agent brain powers three interfaces:
 
 The homelab uses a tiered approach to autonomous repair, escalating from fast/cheap to slow/powerful only when needed.
 
-### Tier 1 — Fast Tool Calls (qwen3:1.7b)
+### Tier 1 — Fast Tool Calls (qwen3.5:4b)
 
-- **Model**: qwen3:1.7b (~8 ms/token, 6.2 GB on GPU)
+- **Model**: qwen3.5:4b (~8 ms/token, 3.4 GB on GPU)
 - **When**: First response to any detected issue
 - **How**: Calls AI agent API tools directly — restart containers, fix permissions, rescan libraries, search/download, check status
 - **Handles**: ~90% of issues in under 1 second
@@ -159,7 +159,7 @@ The homelab uses a tiered approach to autonomous repair, escalating from fast/ch
 ```
 Issue detected by Homelab Agent
   │
-  ├── Tier 1: qwen3:1.7b (instant, tool calls)
+  ├── Tier 1: qwen3.5:4b (instant, tool calls)
   │     ├── Fixed? → log + notify → done
   │     └── Failed? → escalate
   │
@@ -286,7 +286,7 @@ systemd service (continuous, 5min scan loop)
         ├── torrent_doctor — qBit health, VPN stall detection, orphan routing, dead torrent replacement
         ├── system_monitor — DAS mount, disk space + 7-day forecasting, host load/RAM, container resources
         ├── notifications — alert deduplication, resolved notifications, rate limiting, weekly digest
-        └── ai_escalation — 3-tier repair (1.7b → 35b → Claude Code)
+        └── ai_escalation — 3-tier repair (4b → 35b → Claude Code)
 ```
 
 ### Modules
@@ -299,7 +299,7 @@ systemd service (continuous, 5min scan loop)
 | **Torrent Doctor** | qBit health checks, VPN stall detection, dead torrent replacement (0 seeds >5 min → search Gamarr/Prowlarr for alternative), game auto-organize (incoming → vault), Gamarr stuck/failed job retry, orphan routing, ratio-limit checks | Every 5 min |
 | **System Monitor** | DAS mount verification, disk space with 7-day forecasting, host load/RAM, container resource outliers, Prowlarr indexer auto-retry, Tdarr/Unpackerr/Cloudflared monitoring, n8n workflow checks, download directory permissions | Every 5 min |
 | **Notifications** | Fingerprint-based alert deduplication, resolved notifications, rate limiting, weekly digest | Continuous |
-| **AI Escalation** | 3-tier repair system — Tier 1 (1.7b fast tools) → Tier 2 (35b smart fixer) → Tier 3 (Claude Code) | On failure |
+| **AI Escalation** | 3-tier repair system — Tier 1 (4b fast tools) → Tier 2 (35b smart fixer) → Tier 3 (Claude Code) | On failure |
 
 ### Failure Memory
 
@@ -401,7 +401,7 @@ Per-node disk usage monitoring:
 |-------|-------------|-------|---------|
 | **qwen3.5:35b-a3b** | 34.5 GB (GTT) | ~22 ms/token | Eval-proven 10/10 — tool calling, Tier 2 smart fixer, eval harness agent + judge |
 | **gemma4:e4b** | 9.6 GB (GTT) | ~12 ms/token | Production agent default — faster, good for most chat |
-| **qwen3:1.7b** | 6.2 GB (GTT) | ~8 ms/token | Tier 1 fast repairs, Discord file-intent detection |
+| **qwen3.5:4b** | 3.4 GB (GTT) | ~8 ms/token | Tier 1 fast repairs, Discord file-intent detection |
 | **nomic-embed-text** | 275 MB | — | Document RAG, episodic memory, tool-router embeddings |
 
 Models load into GPU memory via GTT (61.7 GB available). `OLLAMA_MAX_LOADED_MODELS=1` means only one big model resident at a time — the eval harness deliberately runs agent + judge on the **same** model to avoid thrash. Idle timeout `OLLAMA_KEEP_ALIVE=2m` reclaims GPU memory between batches.
@@ -458,7 +458,7 @@ pip install torch --index-url https://rocm.nightlies.amd.com/v2/gfx1151/
 - Python 3.11 with full scientific stack (numpy, scipy, pandas, matplotlib, scikit-learn)
 - PyTorch 2.9+ with ROCm 7.12
 - Triton 3.5+ for kernel compilation
-- 48 GB RAM, 32 vCPUs
+- 16 GB RAM, 16 vCPUs
 
 ---
 

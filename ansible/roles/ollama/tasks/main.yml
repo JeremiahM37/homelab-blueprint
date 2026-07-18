@@ -21,7 +21,10 @@
 
 - name: Install Ollama
   ansible.builtin.shell: |
+    set -euo pipefail
     curl -fsSL https://ollama.ai/install.sh | sh
+  args:
+    executable: /bin/bash
   when: ollama_check.rc != 0
 
 - name: Configure Ollama systemd override

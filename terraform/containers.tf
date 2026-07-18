@@ -5,7 +5,7 @@
 locals {
   aiserver_containers = {
     100 = {
-      hostname = "media-monitor"
+      hostname = "homelab-agent"
       cores    = 4
       memory   = 8192
       disk     = 20

@@ -129,7 +129,7 @@ On top of the basic tool-calling loop, the stack adds:
 - **Tier 2 verify step** — after the smart fixer declares a fix, syntax/container-health/LLM-judge checks run; any failure reverts file edits from backups
 - **Eval harness** — canned prompts + LLM judge nightly, with a regression gate in the nightly test suite
 
-A proactive **Homelab Agent** with 7 modules scans every 5 minutes and uses a **3-tier AI repair system** (qwen3:1.7b fast tools → qwen3.5:35b smart fixer with verify → Claude Code backstop) to autonomously detect and fix issues.
+A proactive **Homelab Agent** with 7 modules scans every 5 minutes and uses a **3-tier AI repair system** (qwen3.5:4b fast tools → qwen3.5:35b smart fixer with verify → Claude Code backstop) to autonomously detect and fix issues.
 
 ### How It Works
 
@@ -177,9 +177,10 @@ See [AI Stack](docs/ai-stack.md) for full details.
 | 101 | project-env | AIServer | LXC | 4c / 4 GB | Development workspace |
 | 102 | openclaw | AIServer | LXC | 16c / 28 GB | Local LLM chat (Ollama + Open-WebUI) |
 | 103 | gaming-bazzite | pve | VM | 7c / 24 GB | Gaming VM with GPU passthrough |
+| 103 | valheim | AIServer | LXC | 4c / 6 GB | Valheim dedicated server |
 | 104 | work-env | AIServer | LXC | 4c / 4 GB | Claude Code, Docker, dev tools |
-| 105 | research-env | AIServer | LXC | 16c / 32 GB | AI/ML research with GPU passthrough (gfx1151, PyTorch ROCm) |
-| 200 | docker-server | MediaServer | LXC | 12c / 24 GB | Main Docker host (57+ containers) |
+| 105 | research-env | AIServer | LXC | 16c / 16 GB | AI/ML research with GPU passthrough (gfx1151, PyTorch ROCm) |
+| 200 | docker-server | MediaServer | LXC | 12c / 24 GB | Main Docker host (55+ containers) |
 
 ---
 
@@ -206,7 +207,7 @@ See [AI Stack](docs/ai-stack.md) for full details.
 ## Quick Stats
 
 - **8 guests** across 3 nodes (7 LXC + 1 VM)
-- **57+ Docker containers** on a single LXC
+- **55+ Docker containers** on a single LXC
 - **~188 GB total RAM** across the cluster
 - **8 TB DAS** for media storage
 - **GPU passthrough** on 2 nodes (NVIDIA for gaming, AMD iGPU shared across 3 LXCs for ML)
@@ -228,13 +229,12 @@ See [AI Stack](docs/ai-stack.md) for full details.
 - **SearXNG** — self-hosted web search for AI agent, Homepage dashboard, Open WebUI
 - **Diagnostic toolkit** — file ops, log reading, permission fixes, library rescans for AI escalation
 - **Unified API** — single FastAPI endpoint aggregating all services (Swagger docs included)
-- **Ecosystem RAG** — natural-language search across the entire homelab (Paperless docs, media catalogs, infra/config, notes, inventory) via local embeddings + LLM, with cited answers
 - **Automated backups** — Restic to DAS, 4 nodes, daily, encrypted, deduplicated
 - **SSO reverse proxy** — nginx + Authelia, 36 subdomains on `*.homelab.internal`, 3-tier auth (true SSO / gate / passthrough), self-signed wildcard cert, dnsmasq for LAN + Tailscale split DNS for remote
 - **CrowdSec IPS** — 1400+ malicious IPs blocked at firewall, community threat intel
 - **Terraform IaC** — cluster LXC/VM shells defined as code ([`terraform/`](terraform), bpg/proxmox provider, importable state); in-guest convergence is Ansible's job
 - **9 n8n workflows** — dual-channel Discord alerts, watchdogs, health checks
-- **AI self-healing** — consolidated Homelab Agent with 3-tier repair (1.7b fast tools → 35b smart fixer → Claude Code backstop) auto-fixes containers, torrents, VPN, permissions, imports, configs
+- **AI self-healing** — consolidated Homelab Agent with 3-tier repair (4b fast tools → 35b smart fixer → Claude Code backstop) auto-fixes containers, torrents, VPN, permissions, imports, configs
 - **Dual-channel Discord alerts** — all watchdogs and bots report to both Discord servers
 - **Zero cloud dependencies** — everything self-hosted (except Cloudflare tunnel for external access)
 

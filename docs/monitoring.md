@@ -62,7 +62,7 @@ The primary monitoring system. Runs on AIServer (port 9106) and scans the entire
 | **Torrent Doctor** | qBit health checks, VPN stall detection, dead torrent replacement (0 seeds >5 min → search Gamarr/Prowlarr for alternative), game auto-organize (incoming → vault), Gamarr stuck/failed job retry, orphan routing, ratio-limit checks | Every 5 min |
 | **System Monitor** | DAS mount verification, disk space with 7-day forecasting, host load/RAM, container resource outliers, Prowlarr indexer auto-retry, Tdarr/Unpackerr/Cloudflared monitoring, n8n workflow checks, download directory permissions | Every 5 min |
 | **Notifications** | Fingerprint-based alert deduplication, resolved notifications, rate limiting, weekly digest | Continuous |
-| **AI Escalation** | 3-tier repair system — Tier 1 (1.7b fast tools) → Tier 2 (35b smart fixer) → Tier 3 (Claude Code) | On failure |
+| **AI Escalation** | 3-tier repair system — Tier 1 (4b fast tools) → Tier 2 (35b smart fixer) → Tier 3 (Claude Code) | On failure |
 
 ### 3-Tier AI Repair System
 
@@ -71,7 +71,7 @@ When the agent detects an issue, it escalates through three tiers:
 ```
 Issue detected
   │
-  ├── Tier 1: qwen3:1.7b (instant, tool calls via AI agent API)
+  ├── Tier 1: qwen3.5:4b (instant, tool calls via AI agent API)
   │     Handles ~90% of issues in <1 second
   │     Tools: restart, permissions, rescan, search, download
   │     ├── Fixed? → log + notify → done
