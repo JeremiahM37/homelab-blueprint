@@ -129,7 +129,7 @@ On top of the basic tool-calling loop, the stack adds:
 - **Tier 2 verify step** — after the smart fixer declares a fix, syntax/container-health/LLM-judge checks run; any failure reverts file edits from backups
 - **Eval harness** — canned prompts + LLM judge nightly, with a regression gate in the nightly test suite
 
-A proactive **Homelab Agent** with 7 modules scans every 5 minutes and uses a **3-tier AI repair system** (qwen3:1.7b fast tools → qwen3.5:35b smart fixer with verify → Claude Code backstop) to autonomously detect and fix issues.
+A proactive **Homelab Agent** with 7 modules scans every 5 minutes and uses a **3-tier AI repair system** (qwen3.5:4b fast tools → qwen3.5:35b smart fixer with verify → Claude Code backstop) to autonomously detect and fix issues.
 
 ### How It Works
 
@@ -234,7 +234,7 @@ See [AI Stack](docs/ai-stack.md) for full details.
 - **CrowdSec IPS** — 1400+ malicious IPs blocked at firewall, community threat intel
 - **Terraform IaC** — cluster LXC/VM shells defined as code ([`terraform/`](terraform), bpg/proxmox provider, importable state); in-guest convergence is Ansible's job
 - **9 n8n workflows** — dual-channel Discord alerts, watchdogs, health checks
-- **AI self-healing** — consolidated Homelab Agent with 3-tier repair (1.7b fast tools → 35b smart fixer → Claude Code backstop) auto-fixes containers, torrents, VPN, permissions, imports, configs
+- **AI self-healing** — consolidated Homelab Agent with 3-tier repair (4b fast tools → 35b smart fixer → Claude Code backstop) auto-fixes containers, torrents, VPN, permissions, imports, configs
 - **Dual-channel Discord alerts** — all watchdogs and bots report to both Discord servers
 - **Zero cloud dependencies** — everything self-hosted (except Cloudflare tunnel for external access)
 

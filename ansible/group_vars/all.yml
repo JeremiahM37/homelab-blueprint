@@ -153,7 +153,8 @@ ollama_port: 11434
 ollama_keep_alive: "2m"
 ollama_models:
   - "qwen3.5:35b-a3b"
-  - "qwen3:1.7b"
+  - "qwen3.5:4b"
+  - "gemma4:e4b"
   - "nomic-embed-text"
 open_webui_port: 8080
 
