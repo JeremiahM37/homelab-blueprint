@@ -28,8 +28,8 @@
   hosts: proxmox_nodes
   tags: [gpu]
   roles:
-    - gpu-passthrough
-  when: gpu_vendor is defined
+    - role: gpu-passthrough
+      when: gpu_vendor is defined
 
 # ── Step 3: Create LXC containers ──
 - name: Create LXC containers on Proxmox nodes

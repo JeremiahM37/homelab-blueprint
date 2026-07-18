@@ -43,19 +43,25 @@
   register: lxc_create_result
   changed_when: "'Created LXC' in lxc_create_result.stdout | default('')"
 
+- name: Build flat list of mount points for this node's containers
+  ansible.builtin.set_fact:
+    lxc_mountpoint_list: >-
+      {%- set entries = [] -%}
+      {%- for vmid, spec in lxc_containers.items() -%}
+        {%- if spec.node | default('') == inventory_hostname -%}
+          {%- for mp_name, mp_value in (spec.mountpoints | default({})).items() -%}
+            {%- set _ = entries.append({'vmid': vmid, 'mp_name': mp_name, 'mp_value': mp_value}) -%}
+          {%- endfor -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ entries }}
+
 - name: Configure mount points for LXC containers
   ansible.builtin.shell: |
-    pct set {{ item.key }} --{{ mp_item.key }} {{ mp_item.value }}
-  loop: "{{ lxc_containers | dict2items }}"
+    pct set {{ item.vmid }} --{{ item.mp_name }} {{ item.mp_value }}
+  loop: "{{ lxc_mountpoint_list }}"
   loop_control:
-    label: "{{ item.key }} mount points"
-  vars:
-    mp_items: "{{ item.value.mountpoints | default({}) | dict2items }}"
-  when:
-    - item.value.node == inventory_hostname
-    - item.value.mountpoints is defined
-    - item.value.mountpoints | length > 0
-  with_items: "{{ mp_items }}"
+    label: "{{ item.vmid }} {{ item.mp_name }}"
   failed_when: false
   changed_when: false
 
