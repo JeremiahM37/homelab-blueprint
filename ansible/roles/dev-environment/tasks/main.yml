@@ -66,6 +66,7 @@
 # --- Node.js via nvm ---
 - name: Install nvm for dev user
   ansible.builtin.shell: |
+    set -euo pipefail
     if [ -d {{ dev_home }}/.nvm ]; then
       echo "nvm already installed"
       exit 0
@@ -96,6 +97,7 @@
 # --- Zellij ---
 - name: Install Zellij
   ansible.builtin.shell: |
+    set -euo pipefail
     if [ -f /usr/local/bin/zellij ]; then
       echo "Zellij already installed"
       exit 0
@@ -104,6 +106,7 @@
     chmod +x /usr/local/bin/zellij
     echo "Installed Zellij {{ zellij_version }}"
   args:
+    executable: /bin/bash
     creates: /usr/local/bin/zellij
   register: zellij_install
   changed_when: "'Installed' in zellij_install.stdout | default('')"

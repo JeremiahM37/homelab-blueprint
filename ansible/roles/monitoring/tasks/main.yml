@@ -26,6 +26,11 @@
     dest: "{{ promtail_config_dir }}/promtail-config.yml"
     mode: "0644"
 
+- name: Check that the Docker Compose file exists
+  ansible.builtin.stat:
+    path: "{{ docker_compose_dir }}/docker-compose.yml"
+  register: monitoring_compose_file
+
 - name: Add Loki and Promtail to Docker Compose (if not already present)
   ansible.builtin.blockinfile:
     path: "{{ docker_compose_dir }}/docker-compose.yml"
@@ -58,7 +63,7 @@
             - internal
           restart: unless-stopped
     insertbefore: "^$"
-  failed_when: false
+  when: monitoring_compose_file.stat.exists
 
 - name: Configure Grafana Loki datasource
   ansible.builtin.copy:
@@ -76,6 +81,7 @@
 
 - name: Start monitoring containers
   ansible.builtin.shell: |
+    set -euo pipefail
     cd {{ docker_compose_dir }}
     docker compose up -d loki promtail
   args:
