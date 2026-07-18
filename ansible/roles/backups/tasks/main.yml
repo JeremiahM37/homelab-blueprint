@@ -125,8 +125,3 @@
     enabled: true
   when: inventory_hostname == 'mediaserver'
   failed_when: false
-
-handlers:
-  - name: Reload systemd
-    ansible.builtin.systemd:
-      daemon_reload: true

@@ -94,13 +94,3 @@
     name: temp-api
     state: started
     enabled: true
-
-handlers:
-  - name: Restart sshd
-    ansible.builtin.service:
-      name: sshd
-      state: restarted
-
-  - name: Reload systemd
-    ansible.builtin.systemd:
-      daemon_reload: true

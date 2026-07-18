@@ -76,13 +76,3 @@
     - gpu_vendor == "amd"
     - amd_gpu_lxc_ids is defined
   failed_when: false
-
-handlers:
-  - name: Update grub and initramfs
-    ansible.builtin.shell: |
-      update-grub
-      update-initramfs -u -k all
-    args:
-      executable: /bin/bash
-    # NOTE: A reboot is required after this but is NOT automated.
-    # The user should reboot manually after verifying the config.

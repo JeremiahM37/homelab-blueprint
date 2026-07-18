@@ -238,8 +238,3 @@
     enabled: true
   loop: "{{ ttyd_instances }}"
   failed_when: false
-
-handlers:
-  - name: Reload systemd
-    ansible.builtin.systemd:
-      daemon_reload: true
