@@ -85,6 +85,16 @@ lxc_containers:
     features: "nesting=1"
     mountpoints:
       mp0: "/mnt/storage/media,mp=/data/media"
+  100:
+    hostname: "homelab-agent"
+    node: "aiserver"
+    cores: 4
+    memory: 8192
+    disk: "20G"
+    ip: ""         # fill in inventory
+    gateway: ""
+    template: "debian-12-standard_12.7-1_amd64.tar.zst"
+    privileged: false
   101:
     hostname: "project-env"
     node: "aiserver"
@@ -129,11 +139,7 @@ lxc_containers:
     template: "debian-12-standard_12.7-1_amd64.tar.zst"
     privileged: false
     features: "nesting=1"
-  106:
-    gateway: ""
-    template: "debian-12-standard_12.7-1_amd64.tar.zst"
-    privileged: false
-    features: "nesting=1"
+  # LXC 106 (ai-detector) archived 2026-05-14 — removed (see terraform/containers.tf).
 
 # --- Ollama ---
 ollama_host: "lxc102"
@@ -173,7 +179,7 @@ temp_api_port: 9101
 # NVIDIA (pve — VM 103)
 nvidia_vfio_ids: "10de:1f07,10de:10f9,10de:1ada,10de:1adb"
 
-# AMD (AIServer — shared across LXCs 102, 105, 106)
+# AMD (AIServer — shared across LXCs 102, 105)
 amd_gpu_devices:
   - "/dev/dri"
   - "/dev/kfd"
