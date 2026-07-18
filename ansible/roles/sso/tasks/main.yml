@@ -117,9 +117,3 @@
   args:
     executable: /bin/bash
   changed_when: false
-
-handlers:
-  - name: Restart dnsmasq
-    ansible.builtin.service:
-      name: dnsmasq
-      state: restarted
