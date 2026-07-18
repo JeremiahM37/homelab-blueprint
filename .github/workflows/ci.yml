@@ -43,6 +43,11 @@ jobs:
       - name: Playbook syntax check
         run: ansible-playbook --syntax-check -i ansible/inventory.example.yml ansible/playbook.yml
 
+      - name: ansible-lint (safety profile)
+        run: |
+          pip install ansible-lint
+          ansible-lint --profile safety ansible/
+
   terraform:
     name: Terraform fmt + validate
     runs-on: ubuntu-latest
