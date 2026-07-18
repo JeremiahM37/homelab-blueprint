@@ -32,7 +32,7 @@ Terraform **+** Ansible **+** restic **+** a few manual steps, as laid out in
 |------|---------|
 | `main.tf` | Provider + backend config |
 | `variables.tf` | Input variables (endpoint, token, password, ssh key) |
-| `containers.tf` | AIServer LXCs (100/101/102/104/105) + MediaServer LXC 200 |
+| `containers.tf` | AIServer LXCs (100/101/102/103/104/105) + MediaServer LXC 200 |
 | `vms.tf` | Bazzite gaming VM template (commented — its node was decommissioned) |
 | `outputs.tf` | Container map + cluster node list |
 | `.terraform.lock.hcl` | Provider version lock |

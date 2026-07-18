@@ -1,11 +1,18 @@
 # =============================================================================
 # AIServer LXC Containers
 # =============================================================================
+# Per-container attributes:
+#   cores = null  → no --cores limit (Proxmox "unlimited": all host cores)
+#   ip    = "dhcp" or a static "CIDR" (example values only — set your own)
+#   gw    = gateway for static IPs, "" for DHCP
+#
+# Transient dev/tooling containers (e.g. scratch build or sandbox-template
+# LXCs) are deliberately NOT modeled here — only the long-lived stack is.
 
 locals {
   aiserver_containers = {
     100 = {
-      hostname = "homelab-agent"
+      hostname = "homelab-agent" # historical live hostname: media-monitor
       cores    = 4
       memory   = 8192
       disk     = 20
@@ -13,6 +20,8 @@ locals {
       nesting  = false
       tun      = false
       gpu      = false
+      ip       = "dhcp"
+      gw       = ""
     }
     101 = {
       hostname = "project-env"
@@ -23,16 +32,32 @@ locals {
       nesting  = false
       tun      = false
       gpu      = false
+      ip       = "dhcp"
+      gw       = ""
     }
     102 = {
       hostname = "openclaw"
       cores    = 16
-      memory   = 28672
-      disk     = 100
+      memory   = 45056
+      disk     = 140
       swap     = 512
       nesting  = false
       tun      = false
       gpu      = true # AMD 8060S iGPU passthrough
+      ip       = "dhcp"
+      gw       = ""
+    }
+    103 = {
+      hostname = "valheim" # dedicated game server — static LAN IP
+      cores    = 4
+      memory   = 6144
+      disk     = 20
+      swap     = 2048
+      nesting  = false
+      tun      = false
+      gpu      = false
+      ip       = "192.168.1.40/24" # example — set your own static IP
+      gw       = "192.168.1.1"
     }
     104 = {
       hostname = "work-env"
@@ -43,16 +68,20 @@ locals {
       nesting  = true
       tun      = true # Tailscale
       gpu      = false
+      ip       = "dhcp"
+      gw       = ""
     }
     105 = {
       hostname = "research-env"
-      cores    = 16
-      memory   = 16384
-      disk     = 124
+      cores    = null # unlimited — all host cores
+      memory   = 32768
+      disk     = 274
       swap     = 512
       nesting  = true
       tun      = false
       gpu      = true # AMD 8060S iGPU passthrough
+      ip       = "dhcp"
+      gw       = ""
     }
     # LXC 106 (ai-detector) archived 2026-05-14 — removed from TF state + config.
   }
@@ -81,13 +110,18 @@ resource "proxmox_virtual_environment_container" "aiserver" {
 
     ip_config {
       ipv4 {
-        address = "dhcp"
+        address = each.value.ip
+        gateway = each.value.gw != "" ? each.value.gw : null
       }
     }
   }
 
-  cpu {
-    cores = each.value.cores
+  # cores = null → omit the cpu block entirely so Proxmox applies no limit
+  dynamic "cpu" {
+    for_each = each.value.cores == null ? [] : [each.value.cores]
+    content {
+      cores = cpu.value
+    }
   }
 
   memory {
@@ -156,6 +190,9 @@ resource "proxmox_virtual_environment_container" "docker_server" {
     size         = 400
   }
 
+  # mp0 — DAS bind mount: host /mnt/storage into the container at /mnt/storage.
+  # Inside the container, /data/media is a symlink to /mnt/storage/media
+  # (created by the Ansible docker-host role).
   mount_point {
     volume = "/mnt/storage"
     path   = "/mnt/storage"

@@ -72,7 +72,7 @@ This repo documents the architecture, services, and lessons learned. No credenti
 - **Boot drives**: Local LVM-thin on each node (~100 GB each)
 - **DAS**: TerraMaster TDAS enclosure, USB-attached to MediaServer, 8 TB btrfs
   - Mounted at `/mnt/storage` on the MediaServer host
-  - Bind-mounted into LXC 200 at `/data/media`
+  - Bind-mounted into LXC 200 at `/mnt/storage` (mp0); inside the container `/data/media` is a symlink to `/mnt/storage/media`
   - All media services depend on this mount — they won't start if the DAS is disconnected
 
 ---
@@ -175,12 +175,15 @@ See [AI Stack](docs/ai-stack.md) for full details.
 |------|------|------|------|-----------|---------|
 | 100 | homelab-agent | AIServer | LXC | 4c / 8 GB | Self-healing Homelab Agent (7 modules, 3-tier AI repair, port 9106) |
 | 101 | project-env | AIServer | LXC | 4c / 4 GB | Development workspace |
-| 102 | openclaw | AIServer | LXC | 16c / 28 GB | Local LLM chat (Ollama + Open-WebUI) |
+| 102 | openclaw | AIServer | LXC | 16c / 44 GB | Local LLM chat (Ollama + Open-WebUI), iGPU passthrough |
 | 103 | gaming-bazzite | pve | VM | 7c / 24 GB | Gaming VM with GPU passthrough |
-| 103 | valheim | AIServer | LXC | 4c / 6 GB | Valheim dedicated server |
-| 104 | work-env | AIServer | LXC | 4c / 4 GB | Claude Code, Docker, dev tools |
-| 105 | research-env | AIServer | LXC | 16c / 16 GB | AI/ML research with GPU passthrough (gfx1151, PyTorch ROCm) |
-| 200 | docker-server | MediaServer | LXC | 12c / 24 GB | Main Docker host (55+ containers) |
+| 103 | valheim | AIServer | LXC | 4c / 6 GB | Valheim dedicated server (static LAN IP) |
+| 104 | work-env | AIServer | LXC | 4c / 4 GB | Claude Code, Docker, dev tools (nesting + keyctl) |
+| 105 | research-env | AIServer | LXC | all cores / 32 GB | AI/ML research with GPU passthrough (gfx1151, PyTorch ROCm) |
+| 200 | docker-server | MediaServer | LXC | 12c / 24 GB | Main Docker host (55+ containers), DAS bind mount |
+
+> Short-lived dev/tooling LXCs (scratch build environments, sandbox templates)
+> come and go on AIServer and are deliberately not tracked in the IaC or this table.
 
 ---
 
