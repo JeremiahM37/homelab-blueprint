@@ -9,7 +9,7 @@ Multiple dedicated LXC containers on a 128 GB RAM node for running local LLMs, M
 ```
 AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │
-├── LXC 102 — "openclaw" (28 GB — LLM Chat)
+├── LXC 102 — "openclaw" (44 GB — LLM Chat)
 │   ├── Ollama (model serving, 2min idle timeout)
 │   │   ├── qwen3.5:35b-a3b (34.5 GB on GPU, chat + tool calling)
 │   │   ├── qwen3.5:4b (3.4 GB on GPU, intent parsing + Tier 1 repairs)
@@ -20,7 +20,7 @@ AIServer (128 GB RAM, 32 cores, Ryzen AI MAX+ 395, Radeon 8060S iGPU)
 │   │   └── MCP tools (Proxmox + Homelab management)
 │   └── MCP tools proxy (Proxmox management from chat)
 │
-├── LXC 105 — "research-env" (16 GB — ML Research)
+├── LXC 105 — "research-env" (32 GB — ML Research)
 │   ├── GPU passthrough (Radeon 8060S via ROCm)
 │   ├── PyTorch 2.9.1 + ROCm 7.12 (native gfx1151)
 │   └── Full scientific Python stack

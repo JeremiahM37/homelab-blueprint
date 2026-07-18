@@ -43,6 +43,13 @@ jobs:
       - name: Playbook syntax check
         run: ansible-playbook --syntax-check -i ansible/inventory.example.yml ansible/playbook.yml
 
+      # min profile: stricter profiles fail only on var-naming[no-role-prefix]
+      # and hyphenated role names — churn, not bugs. Revisit if roles get renamed.
+      - name: ansible-lint (min profile)
+        run: |
+          pip install ansible-lint
+          ansible-lint --profile min ansible/
+
   terraform:
     name: Terraform fmt + validate
     runs-on: ubuntu-latest

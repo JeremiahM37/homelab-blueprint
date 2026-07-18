@@ -75,6 +75,7 @@
 - name: Deploy temp-api systemd service
   ansible.builtin.copy:
     dest: /etc/systemd/system/temp-api.service
+    mode: "0644"
     content: |
       [Unit]
       Description=Temperature Sensor API

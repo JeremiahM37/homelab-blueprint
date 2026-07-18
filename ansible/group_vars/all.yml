@@ -71,6 +71,11 @@ ports:
   nginx_https: 443
 
 # --- LXC container specs ---
+# ip: "dhcp" (default), or a static "CIDR" (set gateway too), or "" to skip
+# creating that container. cores: null → no limit (all host cores).
+# Keep these in sync with terraform/containers.tf and the README guest table.
+lan_gateway: "192.168.1.1"   # example — override in inventory.yml
+
 lxc_containers:
   200:
     hostname: "docker-server"
@@ -80,20 +85,21 @@ lxc_containers:
     disk: "400G"
     swap: 4096
     ip: "{{ docker_host_ip }}/24"
-    gateway: ""    # fill in inventory
+    gateway: "{{ lan_gateway }}"
     template: "debian-12-standard_12.7-1_amd64.tar.zst"
     privileged: false
-    features: "nesting=1"
+    features: "nesting=1,keyctl=1"
     mountpoints:
-      mp0: "/mnt/storage/media,mp=/data/media"
+      # DAS bind mount — /data/media symlink is created by the docker-host role
+      mp0: "/mnt/storage,mp=/mnt/storage"
   100:
-    hostname: "homelab-agent"
+    hostname: "homelab-agent"   # historical live hostname: media-monitor
     node: "aiserver"
     cores: 4
     memory: 8192
     disk: "20G"
     swap: 512
-    ip: ""         # fill in inventory
+    ip: "dhcp"
     gateway: ""
     template: "debian-12-standard_12.7-1_amd64.tar.zst"
     privileged: false
@@ -104,23 +110,32 @@ lxc_containers:
     memory: 4096
     disk: "30G"
     swap: 512
-    ip: ""         # fill in inventory
+    ip: "dhcp"
     gateway: ""
     template: "debian-12-standard_12.7-1_amd64.tar.zst"
     privileged: false
-    features: "nesting=1"
   102:
-    hostname: "openclaw"
+    hostname: "openclaw"        # Ollama + Open-WebUI, AMD iGPU passthrough
     node: "aiserver"
     cores: 16
-    memory: 28672
-    disk: "100G"
+    memory: 45056
+    disk: "140G"
     swap: 512
-    ip: ""
+    ip: "dhcp"
     gateway: ""
     template: "debian-12-standard_12.7-1_amd64.tar.zst"
     privileged: false
-    features: "nesting=1"
+  103:
+    hostname: "valheim"         # dedicated game server — static LAN IP
+    node: "aiserver"
+    cores: 4
+    memory: 6144
+    disk: "20G"
+    swap: 2048
+    ip: "192.168.1.40/24"       # example — set your own static IP
+    gateway: "{{ lan_gateway }}"
+    template: "debian-12-standard_12.7-1_amd64.tar.zst"
+    privileged: false
   104:
     hostname: "work-env"
     node: "aiserver"
@@ -128,24 +143,23 @@ lxc_containers:
     memory: 4096
     disk: "400G"
     swap: 4096
-    ip: ""
+    ip: "dhcp"
     gateway: ""
     template: "debian-12-standard_12.7-1_amd64.tar.zst"
     privileged: false
-    features: "nesting=1"
+    features: "nesting=1,keyctl=1"
   105:
-    hostname: "research-env"
+    hostname: "research-env"    # PyTorch ROCm, AMD iGPU passthrough
     node: "aiserver"
-    cores: 16
-    memory: 16384
-    disk: "124G"
+    cores: null                 # unlimited — all host cores
+    memory: 32768
+    disk: "274G"
     swap: 512
-    ip: ""
+    ip: "dhcp"
     gateway: ""
     template: "debian-12-standard_12.7-1_amd64.tar.zst"
     privileged: false
-    features: "nesting=1"
-  # LXC 106 (ai-detector) archived 2026-05-14 — removed (see terraform/containers.tf).
+    features: "nesting=1,keyctl=1"
 
 # --- Ollama ---
 ollama_host: "lxc102"
