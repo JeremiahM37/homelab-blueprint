@@ -15,6 +15,7 @@
 
 - name: Create LXC containers for this node
   ansible.builtin.shell: |
+    {% set gw = item.value.gateway | default('') %}
     set -e
     VMID={{ item.key }}
 
@@ -31,7 +32,7 @@
       --memory {{ item.value.memory }} \
       --swap {{ item.value.swap | default(512) }} \
       --rootfs {{ lxc_disk_storage }}:{{ item.value.disk }} \
-      --net0 name=eth0,bridge={{ lxc_network_bridge }},ip={{ item.value.ip }}{% if item.value.gateway | default('') | length > 0 %},gw={{ item.value.gateway }}{% endif %} \
+      --net0 name=eth0,bridge={{ lxc_network_bridge }},ip={{ item.value.ip }}{% if gw %},gw={{ gw }}{% endif %} \
       {% if item.value.privileged | default(false) %}--unprivileged 0{% else %}--unprivileged 1{% endif %} \
       {% if item.value.features is defined %}--features {{ item.value.features }}{% endif %} \
       --onboot 1 \

@@ -140,12 +140,12 @@ all:
     ai_hosts:
       hosts:
         lxc102:
-          ansible_host: "YOUR_LXC102_IP"         # e.g. 192.168.1.102
+          ansible_host: "YOUR_LXC102_IP"         # e.g. 192.168.1.50
           ansible_user: root
 
     dev_hosts:
       hosts:
         lxc104:
-          ansible_host: "YOUR_LXC104_IP"         # e.g. 192.168.1.104
+          ansible_host: "YOUR_LXC104_IP"         # e.g. 192.168.1.60
           ansible_user: claude
           ansible_become_password: "YOUR_LXC104_PASSWORD"
