@@ -5,9 +5,6 @@
 #   cores = null  → no --cores limit (Proxmox "unlimited": all host cores)
 #   ip    = "dhcp" or a static "CIDR" (example values only — set your own)
 #   gw    = gateway for static IPs, "" for DHCP
-#
-# Transient dev/tooling containers (e.g. scratch build or sandbox-template
-# LXCs) are deliberately NOT modeled here — only the long-lived stack is.
 
 locals {
   aiserver_containers = {
@@ -83,7 +80,6 @@ locals {
       ip       = "dhcp"
       gw       = ""
     }
-    # LXC 106 (ai-detector) archived 2026-05-14 — removed from TF state + config.
   }
 }
 

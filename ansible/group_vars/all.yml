@@ -160,8 +160,6 @@ lxc_containers:
     template: "debian-12-standard_12.7-1_amd64.tar.zst"
     privileged: false
     features: "nesting=1,keyctl=1"
-  # LXC 106 (ai-detector) archived 2026-05-14 — removed (see terraform/containers.tf).
-  # Transient dev/tooling LXCs are deliberately not modeled here.
 
 # --- Ollama ---
 ollama_host: "lxc102"

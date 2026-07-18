@@ -186,9 +186,6 @@ See [AI Stack](docs/ai-stack.md) for full details.
 | 105 | research-env | AIServer | LXC | all cores / 32 GB | AI/ML research with GPU passthrough (gfx1151, PyTorch ROCm) |
 | 200 | docker-server | MediaServer | LXC | 12c / 24 GB | Main Docker host (55+ containers), DAS bind mount |
 
-> Short-lived dev/tooling LXCs (scratch build environments, sandbox templates)
-> come and go on AIServer and are deliberately not tracked in the IaC or this table.
-
 ---
 
 ## Documentation
