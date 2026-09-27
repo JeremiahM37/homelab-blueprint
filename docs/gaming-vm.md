@@ -1,5 +1,10 @@
 # Gaming VM (Bazzite + GPU Passthrough)
 
+> **Historical reference — retired June 2026.** The gaming node was sold.
+> This is not an active deployment or a current rebuild plan. VMID 103 is now
+> used by a different LXC; do not apply these IDs or addresses to the live cluster.
+> See the [current architecture](../README.md).
+
 A dedicated gaming VM running Bazzite (Fedora Atomic / SteamOS-like) with full NVIDIA GPU passthrough, game streaming via Sunshine/Moonlight, and automated game library management.
 
 ---

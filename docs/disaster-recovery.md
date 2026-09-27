@@ -1,49 +1,81 @@
 # Disaster Recovery
 
-How to rebuild the homelab after losing a node — or everything. The honest
-version: **no single tool rebuilds the cluster.** Recovery is four layers that
-each own a different slice. Knowing which layer owns what is the whole game.
+No single tool rebuilds this homelab. Recover the infrastructure shells,
+configuration, application data and access separately, then verify the result.
 
-## The four layers
+## Recovery layers
 
-| Layer | Recovers | Does **not** recover |
-|-------|----------|----------------------|
-| **Terraform** ([`terraform/`](../terraform)) | Container/VM **shells** — cores, memory, disk, hostname, on the right node | Installed software, app data, GPU passthrough, Tailscale, anything *inside* the guest (→ Ansible) |
-| **restic** (`/mnt/storage/backups/homelab`) | Data + configs — `/home/admin`, `/opt/docker` (incl. the Chroma vector DB), `/etc/pve`, systemd units, LXC configs | Bulk media (excluded by design), caches/logs |
-| **GitHub** | All open-source project code (librarr, gamarr, sentinel, homelab-ai, …) | Local-only uncommitted work — commit/push regularly |
-| **Manual** | GPU passthrough lines, Tailscale auth, Ollama model pulls, app start | — (documented below) |
+| Layer | Recovers | Does not recover |
+|-------|----------|------------------|
+| [Terraform](../terraform/) | Selected container envelopes: placement, cores, RAM, disk and network | Application data, full GPU setup, all operational guests |
+| [Ansible](../ansible/) | Earlier examples of in-guest configuration | A tested full reconstruction of the current estate |
+| Restic | Backed-up host/guest files and Docker state | Excluded media, caches, model blobs and unlisted paths |
+| Git repositories | Published source code | Uncommitted work or private runtime state |
+| Manual steps | Hardware, network identity, auth, model pulls and service activation | Anything not recorded and checked |
 
-> Terraform uses `lifecycle { ignore_changes = all }` — the config is
-> **documentation + shell-recreation**, deliberately not a live reconciler. It
-> won't fight manual changes, and a stray `apply` won't recreate live guests.
+Terraform's `ignore_changes = all` reduces reconciliation of existing resources.
+It does **not** make arbitrary applies safe: new or removed resource definitions
+can still create or destroy infrastructure. Import existing guests, inspect the
+plan, and never use this public example as production state.
 
-## Backup inventory (what restic holds)
+## Nightly backup inventory
 
-- **Repo:** `sftp:root@<mediaserver>:/mnt/storage/backups/homelab` (on the DAS), encrypted + deduplicated. Password stored on each node (not in this repo).
-- **Schedule:** daily 3 AM via systemd timers per node. **Retention:** 7 daily / 4 weekly / 3 monthly.
-- **Contents (verified):**
-  - `aiserver` — `/home/admin` (host services + code), `/etc/pve`, systemd units
-  - `lxc200-docker` — all of `/opt/docker` (the entire Docker stack + the Chroma volume), `docker-compose.yml` + `.env`
-  - `pve` / `mediaserver-host` — Proxmox config, network, VFIO/modprobe, SSH keys
-  - `lxc102/104/105` — per-LXC tarballs
+The encrypted, deduplicated repository is on MediaServer's DAS. Daily timers use
+seven daily / four weekly / three monthly retention.
 
-## Restore runbook (full rebuild, in order)
+- AIServer: home configuration/source, Proxmox configuration and selected units.
+- LXC 200: Docker configuration and application trees under `/opt/docker`.
+- MediaServer: host configuration, network and SSH material.
+- Selected AIServer guests: per-guest configuration/source archives, including
+  the current development workspace and shared browser setup.
+- Relocated non-cache project and recovery directories: explicitly included
+  from `/mnt/bulk` where needed.
 
-1. **Proxmox nodes** — reinstall Proxmox; restore `/etc/pve`, network config, and (for the gaming node) GRUB/VFIO/modprobe from the restic `pve`/`mediaserver-host` snapshots.
-2. **Container shells** — `cd terraform && terraform init && terraform apply` to recreate the LXC/VM shells (the config lives in [`terraform/`](../terraform) in this repo). (Or `pct restore` from a vzdump archive if you have one — faster for a single guest.)
-3. **Data + configs** — `restic restore <snapshot> --target /` per guest/host to repopulate `/home/admin`, `/opt/docker`, etc.
-4. **Bring services up:**
-   - LXC 200: `cd /opt/docker && docker compose up -d` (restores all containers incl. Chroma).
-   - AIServer host: `systemctl daemon-reload && systemctl enable --now <unit>` for each restored systemd service (doc-rag, homelab-api, mcpo-*, timers).
-5. **Manual steps (not captured by the above):**
-   - **GPU passthrough** (LXC 102/105): re-add the `lxc.cgroup2.devices.allow` + `lxc.mount.entry` lines to the container config (not supported by the TF provider).
-   - **Gaming VM**: confirm IOMMU + `vfio-pci` binding (`10de:*` IDs) before starting.
-   - **Tailscale**: re-authenticate each node (`tailscale up`).
-   - **Ollama models**: re-pull on LXC 102 (`ollama pull <model>`) — model blobs aren't backed up.
+Inspect the backup scripts and actual snapshot paths for exact coverage. Restic
+**does not follow directory symlinks**. A directory moved to bulk and symlinked
+back into home disappears from a home-only backup unless its real path is added.
 
-## Known gaps / gotchas
+Historical gaming-node and AI-detector snapshots are recovery records, not
+proof those services are still running. Guest IDs have been reused.
 
-- **Media is not backed up** (too large) — it's re-acquirable via the *arr stack, by design.
-- **Ollama model blobs** are not backed up — re-pull them.
-- **Cross-host restic permissions:** the repo lives on a shared DAS mount. AIServer/pve/MediaServer write snapshots via SFTP **as root** (mode `0660`); LXC 200 is **unprivileged** and reads the repo via the local mount, where root-owned files appear as `nobody` → "permission denied" → its backup silently fails. Fix: keep the repo world-readable (`chmod -R a+rX` the repo; content is encrypted so this is safe). The AIServer backup script now does this automatically after each run.
-- **Verify restores periodically** — a backup you haven't test-restored is a hope, not a backup.
+## Cold archive
+
+A separate repository on the DAS holds inactive recovery trees, model/research
+outputs and other verified offloaded data. It has no automatic retention
+policy: some originals no longer exist locally.
+
+Keep receipts with snapshot ID, original path and restore path. Before
+reclaiming a source tree, verify a restore and hashes, check for changes since
+backup, and inspect active processes' cwd/open files/mappings. Do not prune this
+repository with the nightly policy.
+
+## Restore order
+
+1. Restore MediaServer storage and verify the DAS mount and btrfs health.
+2. Restore Proxmox host configuration for the **two current nodes**. Plan quorum
+   and network recovery; do not restore the retired host into the active cluster.
+3. Recreate or restore guest shells from checked configuration/vzdump archives.
+   Review VMID reuse and the current disk sizes before importing any state.
+4. Restore files into a staging path first, inspect them and compare expected
+   ownership/layout before placing them into service paths.
+5. Bring up DNS, Tailscale, storage mounts, databases and application services in
+   dependency order. Only the intended Compose profiles should start.
+6. Restore GPU device mappings, model files where archived (or pull again),
+   service environment files and authentication. Keep credential values private.
+7. Check direct endpoints, gateway access, actual browser flows and logs. Run
+   the affected project's `verify` suite.
+
+The shared browser contains account sessions; its backups need the same care as
+other credentials. Keep it private and restore permissions before starting it.
+
+## Verification and limits
+
+- Test-restored hashes are stronger evidence than “backup completed.”
+- Repository freshness and guest coverage are different questions.
+- Restic repository permissions must work for each writer, including
+  unprivileged LXC mappings. Verify the intended identities rather than blindly
+  copying host ownership or weakening permissions.
+- Bulk media and re-downloadable model blobs are not assumed backed up.
+- A DAS backup is a different-host copy, not an off-site disaster strategy.
+- Thin-pool capacity and root filesystem capacity are separate limits. Removing
+  a thin guest disk does not free extents in the fixed root LV.

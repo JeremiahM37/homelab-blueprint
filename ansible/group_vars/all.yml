@@ -47,7 +47,6 @@ ports:
   audiobookshelf: 13378
   calibre_web: 8083
   kavita: 5005
-  shelfarr: 5056
   sentinel: 9200
   gamevault: 8087
   romm: 8086
@@ -71,104 +70,117 @@ ports:
   nginx_https: 443
 
 # --- LXC container specs ---
-# ip: "dhcp" (default), or a static "CIDR" (set gateway too), or "" to skip
-# creating that container. cores: null → no limit (all host cores).
-# Keep these in sync with terraform/containers.tf and the README guest table.
-lan_gateway: "192.168.1.1"   # example — override in inventory.yml
-
+# Container shells only; restore data, users, GPU mappings and services separately.
+# Disk is GiB. LXC 110 is a clone template restored separately.
 lxc_containers:
   200:
-    hostname: "docker-server"
-    node: "mediaserver"
+    hostname: docker-server
+    node: mediaserver
+    memory: 24576
+    disk: 400
+    ip: dhcp
+    privileged: false
+    features: nesting=1
+    onboot: true
+    start: true
     cores: 12
-    memory: 24576  # MB
-    disk: "400G"
-    swap: 4096
-    ip: "{{ docker_host_ip }}/24"
-    gateway: "{{ lan_gateway }}"
-    template: "debian-12-standard_12.7-1_amd64.tar.zst"
-    privileged: false
-    features: "nesting=1,keyctl=1"
     mountpoints:
-      # DAS bind mount — /data/media symlink is created by the docker-host role
-      mp0: "/mnt/storage,mp=/mnt/storage"
+      mp0: /mnt/storage,mp=/mnt/storage
   100:
-    hostname: "homelab-agent"   # historical live hostname: media-monitor
-    node: "aiserver"
-    cores: 4
+    hostname: media-monitor
+    node: aiserver
     memory: 8192
-    disk: "20G"
-    swap: 512
-    ip: "dhcp"
-    gateway: ""
-    template: "debian-12-standard_12.7-1_amd64.tar.zst"
+    disk: 20
+    ip: dhcp
     privileged: false
+    features: nesting=1
+    onboot: true
+    start: true
+    cores: 4
   101:
-    hostname: "project-env"
-    node: "aiserver"
-    cores: 4
+    hostname: project-env
+    node: aiserver
     memory: 4096
-    disk: "30G"
-    swap: 512
-    ip: "dhcp"
-    gateway: ""
-    template: "debian-12-standard_12.7-1_amd64.tar.zst"
+    disk: 30
+    ip: dhcp
     privileged: false
+    features: nesting=1
+    onboot: true
+    start: true
+    cores: 4
   102:
-    hostname: "openclaw"        # Ollama + Open-WebUI, AMD iGPU passthrough
-    node: "aiserver"
-    cores: 16
+    hostname: openclaw
+    node: aiserver
     memory: 45056
-    disk: "140G"
-    swap: 512
-    ip: "dhcp"
-    gateway: ""
-    template: "debian-12-standard_12.7-1_amd64.tar.zst"
+    disk: 140
+    ip: dhcp
     privileged: false
+    features: nesting=1
+    onboot: true
+    start: true
+    cores: 16
   103:
-    hostname: "valheim"         # dedicated game server — static LAN IP
-    node: "aiserver"
-    cores: 4
+    hostname: valheim
+    node: aiserver
     memory: 6144
-    disk: "20G"
-    swap: 2048
-    ip: "192.168.1.40/24"       # example — set your own static IP
-    gateway: "{{ lan_gateway }}"
-    template: "debian-12-standard_12.7-1_amd64.tar.zst"
+    disk: 20
+    ip: dhcp
     privileged: false
-  104:
-    hostname: "work-env"
-    node: "aiserver"
+    features: nesting=1
+    onboot: false
+    start: false
     cores: 4
+  104:
+    hostname: work-env
+    node: aiserver
     memory: 4096
-    disk: "400G"
-    swap: 4096
-    ip: "dhcp"
-    gateway: ""
-    template: "debian-12-standard_12.7-1_amd64.tar.zst"
+    disk: 400
+    ip: dhcp
     privileged: false
-    features: "nesting=1,keyctl=1"
+    features: nesting=1
+    onboot: true
+    start: true
+    cores: 4
   105:
-    hostname: "research-env"    # PyTorch ROCm, AMD iGPU passthrough
-    node: "aiserver"
-    cores: null                 # unlimited — all host cores
+    hostname: research-env
+    node: aiserver
     memory: 32768
-    disk: "274G"
-    swap: 512
-    ip: "dhcp"
-    gateway: ""
-    template: "debian-12-standard_12.7-1_amd64.tar.zst"
+    disk: 500
+    ip: dhcp
     privileged: false
-    features: "nesting=1,keyctl=1"
+    features: nesting=1
+    onboot: true
+    start: true
+  106:
+    hostname: globality-dev
+    node: aiserver
+    memory: 16384
+    disk: 60
+    ip: dhcp
+    privileged: false
+    features: nesting=1
+    onboot: true
+    start: true
+    cores: 8
+  107:
+    hostname: agent-desk
+    node: aiserver
+    memory: 6144
+    disk: 24
+    ip: dhcp
+    privileged: false
+    features: nesting=1
+    onboot: true
+    start: true
+    cores: 4
 
 # --- Ollama ---
 ollama_host: "lxc102"
 ollama_port: 11434
-ollama_keep_alive: "2m"
+ollama_keep_alive: "5m"
 ollama_models:
-  - "qwen3.5:35b-a3b"
+  - "qwen3.6:35b-a3b"
   - "qwen3.5:4b"
-  - "gemma4:e4b"
   - "nomic-embed-text"
 open_webui_port: 8080
 
@@ -197,10 +209,10 @@ terraform_status_port: 9104
 temp_api_port: 9101
 
 # --- GPU passthrough ---
-# NVIDIA (pve — VM 103)
+# Historical optional NVIDIA example; no NVIDIA host in current inventory
 nvidia_vfio_ids: "10de:1f07,10de:10f9,10de:1ada,10de:1adb"
 
-# AMD (AIServer — shared across LXCs 102, 105)
+# AMD (AIServer — shared across LXCs 102 and 105)
 amd_gpu_devices:
   - "/dev/dri"
   - "/dev/kfd"
@@ -213,7 +225,7 @@ ttyd_instances:
   - { port: 7684, target: "lxc102", description: "OpenClaw" }
   - { port: 7685, target: "lxc200", description: "Docker host" }
   - { port: 7686, target: "mediaserver", description: "MediaServer" }
-  - { port: 7687, target: "pve", description: "pve Gaming" }
+  - { port: 7689, target: "lxc106", description: "Interview workspace" }
 
 # --- Nightly tests ---
 nightly_tests_hour: 5

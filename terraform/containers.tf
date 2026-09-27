@@ -1,15 +1,11 @@
 # =============================================================================
-# AIServer LXC Containers
+# AIServer LXC Containers — resource snapshot, September 2026
 # =============================================================================
-# Per-container attributes:
-#   cores = null  → no --cores limit (Proxmox "unlimited": all host cores)
-#   ip    = "dhcp" or a static "CIDR" (example values only — set your own)
-#   gw    = gateway for static IPs, "" for DHCP
 
 locals {
   aiserver_containers = {
     100 = {
-      hostname = "homelab-agent" # historical live hostname: media-monitor
+      hostname = "media-monitor"
       cores    = 4
       memory   = 8192
       disk     = 20
@@ -17,8 +13,6 @@ locals {
       nesting  = false
       tun      = false
       gpu      = false
-      ip       = "dhcp"
-      gw       = ""
     }
     101 = {
       hostname = "project-env"
@@ -29,8 +23,6 @@ locals {
       nesting  = false
       tun      = false
       gpu      = false
-      ip       = "dhcp"
-      gw       = ""
     }
     102 = {
       hostname = "openclaw"
@@ -41,20 +33,6 @@ locals {
       nesting  = false
       tun      = false
       gpu      = true # AMD 8060S iGPU passthrough
-      ip       = "dhcp"
-      gw       = ""
-    }
-    103 = {
-      hostname = "valheim" # dedicated game server — static LAN IP
-      cores    = 4
-      memory   = 6144
-      disk     = 20
-      swap     = 2048
-      nesting  = false
-      tun      = false
-      gpu      = false
-      ip       = "192.168.1.40/24" # example — set your own static IP
-      gw       = "192.168.1.1"
     }
     104 = {
       hostname = "work-env"
@@ -65,26 +43,54 @@ locals {
       nesting  = true
       tun      = true # Tailscale
       gpu      = false
-      ip       = "dhcp"
-      gw       = ""
     }
     105 = {
       hostname = "research-env"
-      cores    = null # unlimited — all host cores
+      cores    = null
       memory   = 32768
-      disk     = 274
+      disk     = 500
       swap     = 512
       nesting  = true
       tun      = false
       gpu      = true # AMD 8060S iGPU passthrough
-      ip       = "dhcp"
-      gw       = ""
     }
+    103 = {
+      hostname = "valheim"
+      cores    = 4
+      memory   = 6144
+      disk     = 20
+      swap     = 2048
+      nesting  = false
+      tun      = false
+      gpu      = false
+    }
+    106 = {
+      hostname = "globality-dev"
+      cores    = 8
+      memory   = 16384
+      disk     = 60
+      swap     = 2048
+      nesting  = true
+      tun      = true
+      gpu      = false
+    }
+    107 = {
+      hostname = "agent-desk"
+      cores    = 4
+      memory   = 6144
+      disk     = 24
+      swap     = 1024
+      nesting  = true
+      tun      = true
+      gpu      = false
+    }
+    # LXC 110 is a clone template, not a fresh OS install; restore it separately.
+    # Experimental VMs and temporary workshop guests are intentionally omitted.
   }
 }
 
 # NOTE: These resources are for documentation and disaster recovery.
-# To import existing containers: terraform import 'proxmox_virtual_environment_container.aiserver["100"]' AIServer/lxc/100
+# To import existing containers: terraform import 'proxmox_virtual_environment_container.aiserver["100"]' AIServer/100
 # The lxc.cgroup2 and lxc.mount.entry lines for GPU passthrough are NOT natively
 # supported by the Terraform provider — they must be added manually post-create
 # or via a null_resource provisioner.
@@ -103,21 +109,20 @@ resource "proxmox_virtual_environment_container" "aiserver" {
 
   initialization {
     hostname = each.value.hostname
+    user_account {
+      password = var.root_password
+      keys     = var.ssh_public_key != "" ? [var.ssh_public_key] : []
+    }
 
     ip_config {
       ipv4 {
-        address = each.value.ip
-        gateway = each.value.gw != "" ? each.value.gw : null
+        address = "dhcp"
       }
     }
   }
 
-  # cores = null → omit the cpu block entirely so Proxmox applies no limit
-  dynamic "cpu" {
-    for_each = each.value.cores == null ? [] : [each.value.cores]
-    content {
-      cores = cpu.value
-    }
+  cpu {
+    cores = each.value.cores
   }
 
   memory {
@@ -141,7 +146,7 @@ resource "proxmox_virtual_environment_container" "aiserver" {
   }
 
   unprivileged  = true
-  start_on_boot = false
+  start_on_boot = each.key != "103"
 
   lifecycle {
     ignore_changes = all # Don't fight manual changes
@@ -164,6 +169,10 @@ resource "proxmox_virtual_environment_container" "docker_server" {
 
   initialization {
     hostname = "docker-server"
+    user_account {
+      password = var.root_password
+      keys     = var.ssh_public_key != "" ? [var.ssh_public_key] : []
+    }
 
     ip_config {
       ipv4 {
@@ -186,9 +195,6 @@ resource "proxmox_virtual_environment_container" "docker_server" {
     size         = 400
   }
 
-  # mp0 — DAS bind mount: host /mnt/storage into the container at /mnt/storage.
-  # Inside the container, /data/media is a symlink to /mnt/storage/media
-  # (created by the Ansible docker-host role).
   mount_point {
     volume = "/mnt/storage"
     path   = "/mnt/storage"

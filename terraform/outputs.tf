@@ -6,10 +6,9 @@ output "aiserver_containers" {
 }
 
 output "cluster_nodes" {
-  description = "Proxmox cluster nodes (example LAN IPs — set to your own)"
+  description = "Current Proxmox node names; resolve addresses from your own inventory"
   value = {
-    # pve (gaming node) decommissioned 2026-06-22
-    MediaServer = "192.168.1.20"
-    AIServer    = "192.168.1.30"
+    MediaServer = "mediaserver"
+    AIServer    = "aiserver"
   }
 }

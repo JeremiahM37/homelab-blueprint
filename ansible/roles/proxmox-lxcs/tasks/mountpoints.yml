@@ -1,0 +1,5 @@
+---
+- name: Set mount point
+  ansible.builtin.command:
+    cmd: "pct set {{ container.key }} --{{ item.key }} {{ item.value }}"
+  loop: "{{ container.value.mountpoints | dict2items }}"

@@ -49,25 +49,28 @@
   failed_when: false
 
 # --- Homelab Agent ---
-- name: Create homelab-agent directory
-  ansible.builtin.file:
-    path: "{{ homelab_agent_dir }}"
-    state: directory
-    owner: "{{ aiserver_admin_user }}"
-    mode: "0755"
+- name: Legacy host agent deployment (current agent runs in LXC 100)
+  when: homelab_agent_on_host | default(false) | bool
+  block:
+    - name: Create homelab-agent directory
+      ansible.builtin.file:
+        path: "{{ homelab_agent_dir }}"
+        state: directory
+        owner: "{{ aiserver_admin_user }}"
+        mode: "0755"
 
-- name: Deploy homelab-agent systemd service
-  ansible.builtin.template:
-    src: homelab-agent.service.j2
-    dest: /etc/systemd/system/homelab-agent.service
-    mode: "0644"
-  notify: Reload systemd
+    - name: Deploy homelab-agent systemd service
+      ansible.builtin.template:
+        src: homelab-agent.service.j2
+        dest: /etc/systemd/system/homelab-agent.service
+        mode: "0644"
+      notify: Reload systemd
 
-- name: Enable homelab-agent service
-  ansible.builtin.service:
-    name: homelab-agent
-    enabled: true
-  failed_when: false
+    - name: Enable homelab-agent service
+      ansible.builtin.service:
+        name: homelab-agent
+        enabled: true
+      failed_when: false
 
 # --- Document RAG ---
 - name: Create doc-rag directory

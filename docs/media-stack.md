@@ -43,7 +43,7 @@ User Request                Search & Download              Organize & Serve
 
 ```
 ┌──────────┐    ┌───────────────┐    ┌──────────┐
-│ Shelfarr │───▶│   Librarr     │───▶│ qBit /   │
+│ Wishlist │───▶│   Librarr     │───▶│ qBit /   │
 │(wishlist)│    │  (Go, 17 MB)  │    │ DDL      │
 └──────────┘    │ 13 sources    │    └────┬─────┘
                 │ Torznab/OPDS  │         │
@@ -65,7 +65,7 @@ User Request                Search & Download              Organize & Serve
                 └──────────┴───────────┴───────────┘
 ```
 
-- **Shelfarr** — Track wanted books, send to Librarr
+- **Librarr wishlist / PWA Books** — Track wanted books in the current workflow; Shelfarr is retired
 - **Librarr** — Go binary (17 MB, rewritten from Python Flask), searches 13 sources in parallel, exposes Torznab/Newznab API for integration with *arr apps, serves an OPDS feed for e-readers, and includes an embedded web UI
 - **Sentinel** — Go binary (11 MB), download guardian that tracks the full pipeline from request to library arrival with definitive verification
 - **Post-download**: Organize files → import to appropriate library → track in SQLite
@@ -74,8 +74,8 @@ User Request                Search & Download              Organize & Serve
 
 | Source | Content | Method |
 |--------|---------|--------|
-| Anna's Archive | Ebooks (epub, pdf) | Direct download via LibGen mirrors |
-| Anna's Archive (manga) | Manga volumes | Direct download |
+| Anna's Archive | Ebooks (epub, pdf) | Search unavailable at the audit; do not assume a healthy source |
+| Anna's Archive (manga) | Manga volumes | Same search limitation |
 | Prowlarr | Ebooks, audiobooks via torrent indexers | Torrent via qBittorrent |
 | AudioBookBay | Audiobooks | Magnet link via qBittorrent |
 | Project Gutenberg | Public domain ebooks | Direct download |
@@ -120,7 +120,7 @@ DAS (8 TB btrfs)
     └── ...
 ```
 
-The DAS is USB-attached to the MediaServer host, mounted at `/mnt/storage`, and bind-mounted into LXC 200 at `/data/media`.
+The DAS is USB-attached to the MediaServer host, mounted at `/mnt/storage`, and passed into LXC 200 at `/mnt/storage`; `/data/media` resolves to the media subtree.
 
 **Critical**: All media services depend on this mount. If the DAS is disconnected, containers will fail to start or crash with I/O errors. Always verify the mount before troubleshooting service issues:
 
@@ -132,7 +132,7 @@ mountpoint /mnt/storage && ls /mnt/storage/media
 
 ## Permissions
 
-All containers run with PUID/PGID 1000. Download directories **must** be owned by `1000:1000`:
+Download containers such as qBittorrent run with PUID/PGID 1000. Download directories **must** be owned by `1000:1000`:
 
 ```bash
 chown -R 1000:1000 /data/media/books/ebooks/incoming
@@ -145,3 +145,9 @@ qBittorrent will show "error" state if it can't write to the download directory 
 ## FlareSolverr
 
 Some indexers use Cloudflare protection. FlareSolverr runs a headless browser to solve challenges and passes cookies back to Prowlarr. It's internal-only (no exposed port) and used automatically by Prowlarr when needed.
+
+
+Source support is not source availability. A supported driver can be offline or
+blocked; failures must trip health/circuit logic rather than return an empty
+success. The current Anna's search outage is not fixed by repeating the old
+LibGen-mirror fallback.

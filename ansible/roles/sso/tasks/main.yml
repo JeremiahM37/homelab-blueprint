@@ -76,11 +76,6 @@
     dest: "{{ nginx_config_dir }}/nginx.conf"
     mode: "0644"
 
-- name: Check that the Docker Compose file exists
-  ansible.builtin.stat:
-    path: "{{ docker_compose_dir }}/docker-compose.yml"
-  register: sso_compose_file
-
 - name: Add Authelia and nginx to Docker Compose (if not already present)
   ansible.builtin.blockinfile:
     path: "{{ docker_compose_dir }}/docker-compose.yml"
@@ -112,14 +107,11 @@
           networks:
             - proxy
           restart: unless-stopped
-    # Appended at EOF — the compose file ends inside the services: map, so the
-    # two-space indented block lands at service level. (insertbefore: "^$"
-    # would splice the block into the first blank line and corrupt the file.)
-  when: sso_compose_file.stat.exists
+    insertbefore: "^$"
+  failed_when: false
 
 - name: Restart SSO containers
   ansible.builtin.shell: |
-    set -euo pipefail
     cd {{ docker_compose_dir }}
     docker compose up -d authelia nginx-proxy
   args:

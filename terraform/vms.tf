@@ -3,7 +3,7 @@
 # -----------------------------------------------------------------------------
 # The "pve" node was sold and removed from the cluster. The VM below is kept
 # COMMENTED OUT as a rebuild template. To recreate on a new node:
-#   1. set node_name to the new Proxmox node
+#   1. choose an unused vm_id (103 is now Valheim), and set node_name to the new Proxmox node
 #   2. update the GPU `hostpci` id to the new GPU's PCI address (the RTX 2070
 #      left with the old machine — find the new id via `lspci -nn | grep VGA`)
 #   3. uncomment, `terraform apply`, then re-run the Bazzite/Sunshine setup

@@ -1,9 +1,11 @@
 # Recreating the Stack from Scratch
 
 A single ordered runbook: start with bare Proxmox hardware, end with the full
-stack running. Every command is meant to be run in the order shown. All values
-in this doc are placeholders or example IPs (`192.168.1.x` examples like
-`.20/.30/.222`) — substitute your own.
+stack running. This is an illustrative template, not a tested full recovery procedure. Review
+every task against your platform and your own backup plan before running it.
+Use DHCP for node and guest addresses; prefer Tailscale IPs or MagicDNS names
+for administration so a LAN subnet change does not invalidate the configuration.
+No LAN address is embedded in this guide.
 
 The layers, in order:
 
@@ -21,25 +23,27 @@ The layers, in order:
 
 - **Two or more Proxmox VE 8/9 nodes** on one flat LAN. The blueprint names
   them `AIServer` (AI/LXC node, lots of RAM — the reference box has 128 GB)
-  and `MediaServer` (media node, ~28 GB). A third gaming node with an NVIDIA
-  GPU is optional (see `terraform/vms.tf`, commented out).
+  and `MediaServer` (media node, ~28 GB). The old gaming node and its VM are retired; historical notes remain clearly
+  marked in the relevant docs.
 - **External storage** (DAS/NAS disk) attached to MediaServer, formatted (btrfs
   in the reference build) — this holds all media and the backup repo.
 - A **control machine** (laptop or one of the nodes) with `git`, `terraform`,
   and `python3`/`pip` for Ansible.
-- A LAN router where you can set DHCP reservations (or you assign static IPs).
+- A LAN router that provides DHCP. Keep LAN addresses out of service configuration.
 
 Adapt-to-taste knobs (single node? rename nodes?) are called out inline.
 
 ## 1. Proxmox preparation (per node, manual)
 
-1. **Install Proxmox VE** on each node; give each a static IP or DHCP
-   reservation (examples: MediaServer `192.168.1.20`, AIServer `192.168.1.30`).
+1. **Install Proxmox VE** on each node and configure DHCP. Add Tailscale to the
+   nodes when they are reachable, then use their tailnet IPs or MagicDNS names
+   for administration. Do not pin a LAN subnet in this guide or service config.
 2. **Cluster them** (optional but assumed): on the first node
-   `pvecm create homelab`, on the others `pvecm add 192.168.1.20`.
-3. **SSH keys**: from the control machine, `ssh-copy-id root@192.168.1.20` and
-   `ssh-copy-id root@192.168.1.30`. Terraform (provider SSH) and Ansible both
-   assume key-based root SSH to the nodes.
+   `pvecm create homelab`, on the others `pvecm add "$AISERVER_HOST"`
+   (replace the variable with the first node’s reachable address).
+3. **SSH keys**: set `MEDIASERVER_HOST` and `AISERVER_HOST` to the nodes’
+   Tailscale IPs or MagicDNS names, then install keys with `ssh-copy-id` for
+   the account you will use. Terraform and Ansible need reachable SSH access.
 4. **Storage names**: the IaC uses Proxmox's defaults — `local` (templates)
    and `local-lvm` (guest disks). If your storage is named differently
    (e.g. ZFS pool `rpool-data`), change `datastore_id` in
@@ -79,7 +83,8 @@ terraform apply
 
 - Node names in `containers.tf` are `AIServer` and `MediaServer` — change
   `node_name` if your nodes are named differently.
-- LXC 103 (valheim) carries a static example IP (`192.168.1.40/24`) — edit it.
+- Guest network addresses use DHCP by default. Keep the sample configuration
+  subnet-agnostic; use Tailscale for stable remote access where available.
 - **Existing guests?** Import instead of recreating — see `terraform/README.md`.
 - GPU passthrough `lxc.cgroup2`/`lxc.mount.entry` lines can't be expressed by
   the provider; the Ansible `gpu` tag adds them.
@@ -134,7 +139,7 @@ The `docker` tag does all of this for you. Manual equivalent (or for
 re-runs):
 
 ```bash
-ssh root@192.168.1.222          # your LXC 200 IP
+ssh root@"$LXC200_HOST"          # your LXC 200 IP
 cd /opt/docker
 cp docker-compose.example.yml docker-compose.yml   # if not copied by Ansible
 cp .env.example .env && $EDITOR .env               # every secret — see section 6
@@ -184,7 +189,7 @@ No real secrets exist anywhere in this repo. You must provide, by file:
 
 | Placeholder | Purpose |
 |-------------|---------|
-| `proxmox_endpoint` | Proxmox API URL, e.g. `https://192.168.1.30:8006` |
+| `proxmox_endpoint` | Proxmox API URL, e.g. `https://$AISERVER_HOST:8006` |
 | `proxmox_api_token` | `terraform@pve!iac=<uuid>` from step 1.6 |
 | `root_password` | root password set inside new containers |
 | `ssh_public_key` | your public key, injected into containers |
@@ -193,8 +198,8 @@ No real secrets exist anywhere in this repo. You must provide, by file:
 
 | Placeholder | Purpose |
 |-------------|---------|
-| `ansible_host` per node/guest | node and LXC IPs |
-| `lan_gateway`, `docker_host_ip`, `das_uuid` | network + storage identity |
+| `ansible_host` per node/guest | Tailscale IPs or MagicDNS names |
+| `docker_host_ip`, `das_uuid` | stable tailnet address + storage identity |
 | `ssh_authorized_keys` (optional) | key(s) pushed to all nodes |
 | `ansible_become_password` (aiserver, lxc104) | sudo passwords for non-root hosts |
 | `vault_vpn_private_key`, `vault_vpn_address` | WireGuard credentials from your VPN provider (gluetun) |
@@ -219,32 +224,36 @@ list: repo-root `.env.example`.
 
 ## 7. Post-deploy verification
 
-From the control machine (substitute your IPs):
+From the control machine, set these values to reachable Tailscale IPs or
+MagicDNS names before running the examples:
 
 ```bash
+export AISERVER_HOST=aiserver
+export MEDIASERVER_HOST=mediaserver
+export LXC200_HOST=lxc200
 # Proxmox + guests
-ssh root@192.168.1.30 'pct list'                          # LXCs 100–105 running
-ssh root@192.168.1.20 'pct list && mountpoint /mnt/storage'   # 200 + DAS mounted
-ssh root@192.168.1.222 'readlink /data/media'             # -> /mnt/storage/media
+ssh root@$AISERVER_HOST 'pct list'                          # LXCs 100–105 running
+ssh root@$MEDIASERVER_HOST 'pct list && mountpoint /mnt/storage'   # 200 + DAS mounted
+ssh root@"$LXC200_HOST" 'readlink /data/media'             # -> /mnt/storage/media
 
 # Docker stack (LXC 200)
-ssh root@192.168.1.222 'docker ps --format "{{.Names}} {{.Status}}" | grep -vi "up" || echo ALL-UP'
-curl -fsS http://192.168.1.222:8096/health                # Jellyfin
-curl -fsS http://192.168.1.222:9696/ping                  # Prowlarr
-curl -fsS http://192.168.1.222:8080 -o /dev/null -w '%{http_code}\n'   # qBittorrent (via gluetun)
-curl -fsS http://192.168.1.222:8001/v1/publicip/ip        # gluetun: VPN exit IP (must NOT be your WAN IP)
-curl -fsSk https://192.168.1.222 -H 'Host: auth.homelab.internal' -o /dev/null -w '%{http_code}\n'  # Authelia via nginx
-dig +short jellyfin.homelab.internal @192.168.1.222       # dnsmasq answers
+ssh root@"$LXC200_HOST" 'docker ps --format "{{.Names}} {{.Status}}" | grep -vi "up" || echo ALL-UP'
+curl -fsS http://$LXC200_HOST:8096/health                # Jellyfin
+curl -fsS http://$LXC200_HOST:9696/ping                  # Prowlarr
+curl -fsS http://$LXC200_HOST:8080 -o /dev/null -w '%{http_code}\n'   # qBittorrent (via gluetun)
+curl -fsS http://$LXC200_HOST:8001/v1/publicip/ip        # gluetun: VPN exit IP (must NOT be your WAN IP)
+curl -fsSk https://$LXC200_HOST -H 'Host: auth.homelab.internal' -o /dev/null -w '%{http_code}\n'  # Authelia via nginx
+dig +short jellyfin.homelab.internal @$LXC200_HOST       # dnsmasq answers
 
 # AI stack
 curl -fsS http://<LXC102_IP>:11434/api/tags               # Ollama models present
 curl -fsS http://<LXC102_IP>:8080 -o /dev/null -w '%{http_code}\n'    # Open-WebUI
 
 # Node services + backups
-curl -fsS http://192.168.1.30:9101/                       # temp-api (each node)
-curl -fsS http://192.168.1.20:9102/                       # backup-status-api
-ssh root@192.168.1.30 'systemctl list-timers backup-* nightly-tests.timer --no-pager'
-ssh root@192.168.1.20 'RESTIC_PASSWORD=<YOUR_RESTIC_PASSWORD> restic -r /mnt/storage/backups/homelab snapshots | tail -5'
+curl -fsS http://$AISERVER_HOST:9101/                       # temp-api (each node)
+curl -fsS http://$MEDIASERVER_HOST:9102/                       # backup-status-api
+ssh root@$AISERVER_HOST 'systemctl list-timers backup-* nightly-tests.timer --no-pager'
+ssh root@$MEDIASERVER_HOST 'RESTIC_PASSWORD=<YOUR_RESTIC_PASSWORD> restic -r /mnt/storage/backups/homelab snapshots | tail -5'
 ```
 
 All green? Finish with the first-run wizards listed in

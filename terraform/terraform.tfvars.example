@@ -3,7 +3,7 @@
 
 # Proxmox API endpoint. Use any cluster member that is always-on
 # (the cluster API answers from any node). Example:
-proxmox_endpoint = "https://192.168.1.30:8006"
+proxmox_endpoint = "https://aiserver.example.ts.net:8006"
 
 # Proxmox API token in the form "user@realm!tokenid=uuid".
 # Create one in the Proxmox UI: Datacenter > Permissions > API Tokens.

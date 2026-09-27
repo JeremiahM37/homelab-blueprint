@@ -1,304 +1,116 @@
-# Monitoring & Automation
-
-Multiple layers of monitoring ensure services stay healthy with minimal manual intervention. The **Homelab Agent** provides proactive autonomous monitoring with a 3-tier AI repair system, while n8n workflows handle specific watchdog tasks.
-
----
-
-## Monitoring Stack
-
-```
-┌─────────────────────────────────────────────────────┐
-│                   Grafana (dashboards)               │
-│                        ▲                             │
-│            ┌───────────┼───────────┐                 │
-│            │           │           │                 │
-│        Prometheus   cAdvisor   node-exporter         │
-│       (time-series) (container) (host metrics)       │
-└─────────────────────────────────────────────────────┘
-
-┌────────────────┐  ┌──────────────┐  ┌───────────────────────┐
-│  Uptime Kuma   │  │    n8n       │  │   Homelab Agent       │
-│ (HTTP/TCP/ping │  │ (workflow    │  │ (7-module proactive   │
-│  checks)       │  │  automation) │  │  monitoring + 3-tier  │
-└────────────────┘  └──────────────┘  │  AI repair system)    │
-                                      └───────────────────────┘
+# Monitoring
 
-┌─────────────────────────────────────────────────────┐
-│             SSO / Reverse Proxy Layer                 │
-│  nginx (34 subdomains) ──► Authelia (file-based SSO) │
-│  *.homelab.internal · self-signed wildcard cert       │
-│  dnsmasq for local DNS resolution                    │
-└─────────────────────────────────────────────────────┘
+The Homelab Agent in **LXC 100** runs proactive checks. Prometheus/Grafana store
+metrics, Uptime Kuma checks availability, n8n handles selected workflows, and
+Homepage/PWA surface information from those existing services.
 
-┌─────────────────────────────────────────────────────┐
-│               Library Verification                   │
-│  Real API proof — file paths, durations, page counts │
-│  /api/verify/check  ·  /api/verify/check-all         │
-└─────────────────────────────────────────────────────┘
-```
+## Layers
 
----
+| Layer | Purpose |
+|-------|---------|
+| Homelab Agent | Five-minute scans, failure memory, repairs and escalation |
+| Uptime Kuma | HTTP/TCP availability and notifications |
+| n8n | Selected container, indexer, VPN, backup and disk workflows |
+| Prometheus | Metrics from node-exporter, cAdvisor and existing service endpoints |
+| Grafana | Container history, host/rack views and project analytics |
+| Nightly suite | Broader integration checks and a recorded result |
+| `verify` | Checks after a change, including actual browser flows |
 
-## Uptime Kuma
+## Homelab Agent
 
-Simple uptime monitoring for all services. Checks HTTP endpoints, TCP ports, and ping targets. Sends alerts when services go down.
+The historical hostname is `media-monitor`; the service is `homelab-agent` on
+port 9106 **inside LXC 100**, not on AIServer's host address.
 
-- Port: 3001
-- Monitors all 55+ Docker services + external endpoints
+Its modules are container doctor, source intelligence, import watchdog,
+torrent doctor, system monitor, notifications and AI escalation. SQLite stores
+failures and attempts; alert fingerprints prevent repeated notifications.
 
----
+Repair escalates from the small local model and bounded tools to a larger
+fixer with backups/audit records, then to coding-agent review. See
+[AI Stack](ai-stack.md). Detection cadence is not a guarantee that every failure
+can be repaired automatically.
 
-## Homelab Agent (Proactive Autonomous Monitoring)
+## Storage: monitor what can fill
 
-The primary monitoring system. Runs on AIServer (port 9106) and scans the entire homelab every 5 minutes, detecting and fixing issues before they become visible to the user. Replaced the earlier Media Monitor (LXC 100), consolidating all monitoring into a single agent on the host.
+`/api/system/storage/<node>` has two kinds of data:
 
-### 7 Modules
+- Top-level disk totals describe physical capacity.
+- `filesystems` and `tightest` describe the mounted filesystems that can fill.
 
-| Module | Purpose | Frequency |
-|--------|---------|-----------|
-| **Container Doctor** | Monitors 14 key containers, auto-restarts crashed ones, crash loop guard | Every 5 min |
-| **Source Intelligence** | Checks all 13 Librarr search sources, tracks availability, detects outages | Every 60 min |
-| **Import Watchdog** | Detects stuck downloads and failed imports, auto-retries | Every 5 min |
-| **Torrent Doctor** | qBit health checks, VPN stall detection, dead torrent replacement (0 seeds >5 min → search Gamarr/Prowlarr for alternative), game auto-organize (incoming → vault), Gamarr stuck/failed job retry, orphan routing, ratio-limit checks | Every 5 min |
-| **System Monitor** | DAS mount verification, disk space with 7-day forecasting, host load/RAM, container resource outliers, Prowlarr indexer auto-retry, Tdarr/Unpackerr/Cloudflared monitoring, n8n workflow checks, download directory permissions | Every 5 min |
-| **Notifications** | Fingerprint-based alert deduplication, resolved notifications, rate limiting, weekly digest | Continuous |
-| **AI Escalation** | 3-tier repair system — Tier 1 (4b fast tools) → Tier 2 (35b smart fixer) → Tier 3 (Claude Code) | On failure |
+AIServer once reached 100% on its root LV while the larger NVMe looked mostly
+empty. Homepage now displays `tightest.mount`, `tightest.percent` and
+`tightest.free_gb`. MediaServer's DAS is also shown separately.
 
-### 3-Tier AI Repair System
+Monitor `/mnt/bulk` and the underlying LVM thin pool independently. A thin LV's
+logical size is not reserved physical capacity. The current API's filesystem
+inventory must be checked before assuming it includes every new mount.
 
-When the agent detects an issue, it escalates through three tiers:
+A missing DAS can resemble many unrelated broken media services. Check the
+host mount, btrfs device errors and the LXC bind mount before restarting apps.
 
-```
-Issue detected
-  │
-  ├── Tier 1: qwen3.5:4b (instant, tool calls via AI agent API)
-  │     Handles ~90% of issues in <1 second
-  │     Tools: restart, permissions, rescan, search, download
-  │     ├── Fixed? → log + notify → done
-  │     └── Failed? → escalate
-  │
-  ├── Tier 2: qwen3.5:35b-a3b (think: true, 19 tools)
-  │     Smart fixer with file editing, command execution, container rebuilds
-  │     Backs up files before editing, logs everything to audit_log.md
-  │     ├── Fixed? → log + notify → done
-  │     └── Failed? → write fix-request.md → escalate
-  │
-  └── Tier 3: Claude Code (runs every 5 hours)
-        Reviews audit_log.md, reverts bad Tier 2 changes
-        Picks up fix-request.md for issues Tiers 1+2 couldn't solve
-```
+## Metrics without unnecessary load
 
-### Failure Memory
+cAdvisor's filesystem scan once walked every container overlay, used its CPU
+quota continuously and was repeatedly OOM-killed. Disable the `disk` metric,
+use `--docker_only=true`, and match the 60-second housekeeping/scrape cadence.
+This avoids repeated expensive scans of writable layers; use `docker system
+df -v` for image/build-cache storage when investigating capacity.
 
-- SQLite database tracks all failures and remediation attempts
-- Prevents repeating the same fix for recurring issues
-- Fingerprint-based alert deduplication — same alert won't spam Discord
-- Resolved notifications sent when issues clear
+Host temperatures come from the existing temp-api's `/metrics`. No second
+collector is needed. The physical rack display uses Grafana's `rack-panel`
+dashboard at 1024×600, with 14 grid rows and a one-minute refresh.
 
----
+## Backup monitoring
 
-## SSO / Reverse Proxy (Authelia + nginx)
+Check snapshot freshness by **hostname and tags**, not a raw count of snapshots.
+Historical or manually named snapshots can age forever beside healthy scheduled
+backups. Retired lineages remain useful recovery evidence but should not raise
+an active-service alarm.
 
-All browser access to Docker services goes through an **nginx reverse proxy** with **Authelia** single sign-on. Services are accessed via `https://<service>.homelab.internal` instead of direct IP:port.
+Homepage shows backup ages for the active AI host, media host and Docker host.
+This is a quick view, not proof that every guest or relocated directory is
+covered. Monthly Restic checks and trial restores validate the backup pipeline.
+See [Disaster Recovery](disaster-recovery.md).
 
-- **Authelia**: File-based auth, one-factor, session cookie scoped to `.homelab.internal`
-- **nginx**: 34 subdomain server blocks, self-signed wildcard cert (`*.homelab.internal`, 10-year expiry)
-- **dnsmasq**: Resolves `*.homelab.internal` to the Docker host IP
+## VPN monitoring
 
-Three auth tiers:
-1. **True SSO** (Sonarr, Radarr, Prowlarr, Bazarr, Grafana, n8n, Paperless) — Authelia auto-login via `Remote-User` header, no service login needed
-2. **Authelia gate** (Homepage, it-tools, Stirling PDF, Tdarr, Pulse, Sentinel) — services have no built-in auth; Authelia is the sole protection
-3. **Direct passthrough** (Jellyfin, qBittorrent, Audiobookshelf, Kavita, etc.) — nginx proxies without `auth_request`; services use their own login pages
+Subscription expiry, tunnel reachability and verified Mullvad egress are three
+separate checks. An upstream probe outage must not be reported as a leak.
+Provider names from generic IP databases can change with Mullvad's exit hosts;
+the in-tunnel Mullvad response is the stronger signal.
 
-Key files (LXC 200): `/opt/docker/nginx-proxy/nginx.conf`, `/opt/docker/authelia/configuration.yml`, `/opt/docker/authelia/users_database.yml`, `/etc/dnsmasq.d/homelab.conf`
+## Nightly tests
 
----
+The nightly timer runs at 5 AM. `/api/assist/nightly-status` reports the date,
+pass/fail/warning counts and failing checks. Counts evolve; this repo does not
+present an old fixed number as current coverage.
 
-## n8n Watchdog Workflows
+The dashboard refresh preserves failing results. Several old checks still
+assume retired models, frontend markup or unavailable sources. Audit their
+premises individually rather than hiding failures or treating every stale
+assertion as a current outage. A dashboard UI verification passing does not
+mean the entire nightly suite is green.
 
-Automated workflows that detect and remediate common failures. All workflows send alerts to **both Discord servers** (dual-channel).
+## Browser checks
 
-### Bazzite VM Watchdog
+Check Homepage at phone, desktop and ultrawide widths, all four tabs, chat
+open/close and working launch links. Inspect HTTP and HTTPS separately:
+certificate trust, Authelia login, mixed content and same-site cookies change
+what works. Never test a power button by submitting its confirmation.
 
-- **Trigger**: Every 5 minutes
-- **Action**: Pings the gaming VM's Tailscale IP from the Proxmox host
-- **Remediation**: If the VM is unresponsive (frozen), automatically resets it via Proxmox API (`pvesh`)
-- **Why**: GPU passthrough VMs occasionally freeze, and the host has no display (GPU is passed through) so manual intervention requires SSH
-
-### Container Watchdog
-
-- **Trigger**: Every 2 minutes
-- **Action**: Checks qBittorrent and gluetun health
-- **Logic**:
-  - HTTP 403 from qBit = running (just needs auth) -> healthy
-  - ECONNREFUSED/ETIMEDOUT = crashed -> restart
-  - Any HTTP response from gluetun = VPN working
-  - Network error from gluetun = VPN down -> restart
-- **Remediation**: Restarts crashed containers via docker-socket-proxy
-
-### Prowlarr Health Check
-
-- Monitors Prowlarr indexer status via API
-- Alerts on failed indexers
-
-### Arr App Health Check
-
-- Monitors Sonarr, Radarr, Bazarr health endpoints
-- Alerts on import failures, disk space issues
-
-### VPN Leak Detection
-
-- Verifies gluetun VPN tunnel is active
-- Checks public IP matches expected VPN exit
-
-### Disk Space Monitor
-
-- SSH into the media server to check disk usage
-- Alerts when DAS or root filesystem gets low
-
----
-
-## Storage Monitoring
-
-### Per-Node Disk Usage API
-
-The unified API provides real-time disk usage for every node:
-
-```bash
-# All nodes at once
-curl http://YOUR_AISERVER_IP:9105/api/system/storage
-
-# Specific node
-curl http://YOUR_AISERVER_IP:9105/api/system/storage/aiserver
-```
-
-Returns used/free/total/percent for each filesystem.
-
-### Homepage Disk Usage Widgets
-
-The Homepage dashboard includes a **Disk Usage** section with per-device storage widgets:
-
-| Widget | What It Shows |
-|--------|--------------|
-| AIServer | Root filesystem usage |
-| DAS (8TB) | Media storage usage |
-| pve | Gaming node disk usage |
-| LXC 200 | Docker host disk usage |
-
----
-
-## Library Verification
-
-The `/api/verify/*` endpoints perform **definitive** verification of library contents — real API calls that return proof, not fuzzy title matching.
-
-### What Gets Checked
-
-| Library | Verification Method |
-|---------|-------------------|
-| **Jellyfin** | Items API -> file path + media sources + runtime |
-| **Audiobookshelf** | isMissing=false + numAudioFiles > 0 + duration |
-| **Kavita** | Series pages > 0 + folder path |
-| **Gamarr** | Download status + file existence |
-
-### Endpoints
-
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /api/verify/check?title=...&library=jellyfin` | Check specific library |
-| `GET /api/verify/check-all?title=...` | Check ALL libraries simultaneously |
-
-### Integration with Download Guardian
-
-The Guardian's library verification loop uses these endpoints to confirm downloads actually landed in the correct library. It polls every 60 seconds for up to 30 minutes after a download completes.
-
----
-
-## Web Terminals (ttyd)
-
-7 ttyd instances provide browser-based shell access to all nodes. Available from the Mobile PWA's "Term" tab or directly at `http://YOUR_AISERVER_IP:768x`.
-
-| Port | Target | Description |
-|------|--------|-------------|
-| 7681 | AIServer | Host shell (admin) |
-| 7682 | LXC 104 | Work env — Claude Code, Docker, dev |
-| 7683 | LXC 105 | Research env — PyTorch, ROCm |
-| 7684 | LXC 102 | OpenClaw — Ollama, Open-WebUI |
-| 7685 | LXC 200 | Docker host — 55+ containers |
-| 7686 | MediaServer | Proxmox host, DAS, backups |
-| 7687 | pve | Gaming server, GPU passthrough |
-
-Start all: `/home/admin/web-terminals/start-terminals.sh`
-
----
-
-## Homepage Dashboard
-
-### Sections
-
-| Section | Contents |
-|---------|----------|
-| **Server Temps** | AIServer, pve, MediaServer CPU/GPU/NVMe temps (via temp APIs on port 9101) |
-| **Backups** | Docker Configs, AIServer, Gaming Server backup status (via backup-status-api on port 9102) |
-| **Disk Usage** | Per-device storage widgets (AIServer, DAS, pve, LXC 200) |
-| **Infrastructure** | Homelab API, Homelab Agent, Terraform, Open WebUI, SearXNG links |
-| **Media/Books/Games** | All service widgets with stats |
-
-### AI Chat Widget
-
-A floating chat bubble (implemented via `custom.js` and `custom.css`) that connects to the AI agent:
-
-- Sends messages to `/api/ai/agent`
-- Shows **tool-call progress indicators** as the agent works
-- Supports the full 70+ tool set from the dashboard
-
-### Search Widget
-
-The Homepage search bar uses **SearXNG** (self-hosted) instead of Google:
-
-```yaml
-# homepage search widget config
-search:
-  provider: custom
-  url: http://YOUR_DOCKER_HOST_IP:8888/search?q=
-```
-
----
-
-## Nightly Tests (165+ tests, 5 AM daily)
-
-Comprehensive end-to-end test suite that validates every service in the homelab is functioning correctly.
-
-- **Timer**: `nightly-tests.timer` / `nightly-tests.service`
-- **Location**: `/home/admin/nightly-tests/run_all.sh`
-- **Coverage**: HTTP health checks, API endpoints, SSH connectivity, Docker containers, Proxmox cluster, smart fixer validation, tiered escalation checks, 35b model responsiveness
-- **Notification**: Results posted to Discord via Python JSON builder (avoids newline escaping issues with bash)
-- **Runtime**: ~10 minutes for the full suite
-
----
-
-## n8n Tips & Gotchas
-
-- **Version**: n8n v2.x Code nodes do NOT support `fetch()` — use HTTP Request nodes instead
-- **Docker access**: Use docker-socket-proxy (TCP 2375) since there's no `executeCommand` node
-- **Fan-out pattern**: Trigger -> multiple parallel nodes -> merge causes timing errors. Use sequential chains instead.
-- **Gluetun API**: Response body may be in `.data` as a string (content-type mismatch). Check both `.data.includes('public_ip')` and `.public_ip`.
-- **SSH credentials**: Private key must be in credential data, not just node parameters. Host/port/username go in both.
-
----
-
-## Metrics & Dashboards
-
-### Prometheus + Grafana
-
-- **Prometheus**: Scrapes metrics from cAdvisor (container metrics) and node-exporter (host metrics)
-- **Grafana**: Dashboards for container resource usage, host performance, network traffic
-- **cAdvisor**: Per-container CPU, memory, network, disk I/O
-  - Optimized config: `housekeeping_interval=300s`, CPU capped at 0.10, memory limit 512 MB
-  - Default cAdvisor settings caused excessive CPU load — tune `--docker_only=true` and disable expensive metrics (process, percpu, sched, memory_numa)
-- **node-exporter**: Host CPU, memory, disk, network
-
-### CrowdSec
-
-- Intrusion detection analyzing container logs
-- Community-driven threat intelligence
-- Can ban IPs via bouncers (e.g., Cloudflare bouncer for tunnel traffic)
+Read [Dashboard](dashboard.md) for the layout and update procedure.
+
+## Terminals
+
+| Port | Target |
+|------|--------|
+| 7681 | AIServer |
+| 7682 | LXC 104 work environment |
+| 7683 | LXC 105 research |
+| 7684 | LXC 102 inference |
+| 7685 | LXC 200 Docker |
+| 7686 | MediaServer |
+| 7689 | LXC 106 development workspace |
+
+Browser links use the secure PWA's `/term/{port}` wrapper. The Term tab also
+supports temporary terminals. The sold node's terminal is retired.

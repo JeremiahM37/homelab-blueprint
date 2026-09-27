@@ -1,6 +1,6 @@
 # Docker Services (LXC 200)
 
-All services run on a single privileged LXC container (12 cores, 24 GB RAM) using Docker Compose. The compose file defines two networks: `proxy` (for externally-accessible services) and `internal` (for backend databases and inter-service communication).
+All services run on a single unprivileged LXC container (12 cores, 24 GB RAM) using Docker Compose. The compose file defines two networks: `proxy` (for externally-accessible services) and `internal` (for backend databases and inter-service communication).
 
 ---
 
@@ -57,8 +57,21 @@ All services run on a single privileged LXC container (12 cores, 24 GB RAM) usin
 | **changedetection** | 5100 | Website change monitor | With headless Chrome |
 | **stirling-pdf** | 8084 | PDF tools | |
 | **it-tools** | 8085 | Developer utilities | |
-| **silverbullet** | 3002 | Self-hosted Markdown notes | SilverBullet — wikilinks, backlinks, full-text search, installable PWA; notes are plain `.md` files on disk |
 | **lab** | 8099 | Disposable mini-app / widget host | Single-binary Go static server + flat-file KV store; add/remove apps via a registry, installable PWA |
+
+### Files, photos and household tools
+
+| Container | Port | Purpose | Notes |
+|-----------|------|---------|-------|
+| **seafile** | 8082 | File sync/share | MariaDB + memcached; private deployment bypasses login |
+| **immich-server** | 2283 | Photo/video library | ML worker, PostgreSQL and Redis |
+| **firefly** | 8091 | Personal finance | PostgreSQL and cron worker |
+| **firefly-importer** | 8092 | Import bank/CSV data | Companion to Firefly |
+| **jellystat** | 8093 | Viewing analytics | PostgreSQL backend |
+| **grocy** | 8094 | Pantry and household inventory | |
+
+Notes moved to **Grimoire on AIServer (9111)**. SilverBullet and its MCP bridge
+are retired. Syncthing now runs natively on AIServer for the live notes vault.
 
 ### Search
 
@@ -70,7 +83,7 @@ All services run on a single privileged LXC container (12 cores, 24 GB RAM) usin
 
 | Container | Port | Purpose | Notes |
 |-----------|------|---------|-------|
-| **nginx-proxy** | 80, 443 | Reverse proxy | 36 subdomains on `*.homelab.internal`, self-signed wildcard cert (10-year) |
+| **nginx-proxy** | 80, 443 | Reverse proxy | Service gateways on `*.homelab.internal`, self-signed wildcard cert (10-year) |
 | **authelia** | 9091 | SSO identity provider | File-based auth, one-factor, session cookie for `.homelab.internal` |
 
 ### Infrastructure & Monitoring
@@ -84,16 +97,28 @@ All services run on a single privileged LXC container (12 cores, 24 GB RAM) usin
 | **grafana** | 3060 | Metrics dashboard | |
 | **prometheus** | — | Metrics collection | Internal |
 | **cadvisor** | — | Container metrics | Feeds Prometheus |
+| **loki / promtail** | 3100 / — | Logs | Collection and querying |
+| **omada-controller / snmp-exporter** | Host networking / internal | Managed switch | Network management and metrics |
+| **chroma** | 8200 | Vector storage | Doc RAG backend |
 | **node-exporter** | — | Host metrics | Feeds Prometheus |
 | **crowdsec** | — | Intrusion detection | |
 | **watchtower** | — | Auto-update containers | |
 | **autoheal** | — | Auto-restart unhealthy containers | |
 | **pulse** | 7655 | Server stats | |
 | **cloudflared** | — | Cloudflare tunnel | Public access to select services |
-| **docker-socket-proxy** | 2375 | Docker socket for n8n | Read-only proxy |
+| **docker-socket-proxy** | 2375 | Docker socket for n8n | Selected Docker API operations; permits configured writes |
 | **discord-bot** | 3003 | Discord notifications | |
 
 ---
+
+## Host services outside Docker
+
+| Host / guest | Service |
+|--------------|---------|
+| AIServer | Homelab API/PWA (9105), Grimoire (9111), Lectern (9110 / TLS 8443), Formwork (9113), Doc RAG (9103), Syncthing |
+| LXC 100 | Homelab Agent (9106) |
+| LXC 102 | Ollama and Open WebUI |
+| LXC 107 | Agent Desk browser, desktop and MCP gateway |
 
 ## Architecture Notes
 
@@ -104,7 +129,7 @@ Services that need VPN protection use Docker's `network_mode: "service:gluetun"`
 - The container shares gluetun's network namespace
 - All traffic routes through the WireGuard tunnel
 - Ports must be exposed on the gluetun container, not the service itself
-- If gluetun restarts, dependent containers lose networking
+- If Gluetun is recreated, dependents can retain the old namespace; the deployed namespace guard recreates them after the VPN is healthy
 
 ```yaml
 # Example pattern
@@ -133,7 +158,7 @@ Several services use dedicated database containers on the `internal` network:
 ### Volume Strategy
 
 - Config data: `/opt/docker/{service}/` on LXC filesystem
-- Media data: `/data/media/` (bind mount from DAS via host)
+- Media data: `/mnt/storage` is passed into LXC 200; `/data/media` resolves to its media tree
 - Downloads: Through gluetun network, written to `/data/media/` subdirectories
 
 ### PUID/PGID
@@ -142,11 +167,13 @@ Most containers run as UID/GID 1000. Download directories must be owned by `1000
 
 ### SSO Integration
 
-All services are accessible via `https://<service>.homelab.internal` through the nginx reverse proxy. Authentication is handled in three tiers:
+Browser-facing services are accessible via `https://<service>.homelab.internal` through the nginx reverse proxy. Common authentication patterns are:
 
 - **Tier 1 — True SSO**: Sonarr, Radarr, Prowlarr, Bazarr, Grafana, n8n, Paperless trust the `Remote-User` header from Authelia (no service login needed)
 - **Tier 2 — Authelia gate**: Homepage, it-tools, Stirling PDF, Tdarr, Pulse, Sentinel have no built-in auth; Authelia is the sole protection
 - **Tier 3 — Passthrough**: Jellyfin, qBittorrent, Audiobookshelf, Kavita, Portainer, etc. use their own login; nginx proxies without `auth_request`
+
+The private Seafile deployment additionally bypasses its own login; do not copy that behavior to an exposed installation.
 
 API calls from the Homelab API / Agent use direct IP:port (bypassing nginx) — SSO only applies to browser access.
 

@@ -11,22 +11,10 @@ all:
     # --- Domain ---
     homelab_domain: "homelab.internal"
 
-    # --- Network ---
-    lan_gateway: "YOUR_GATEWAY_IP"         # e.g. 192.168.1.1
-
-    # Optional: SSH public key(s) written to /root/.ssh/authorized_keys on all
-    # Proxmox nodes by the common role. One key per line.
-    # ssh_authorized_keys: |
-    #   ssh-ed25519 AAAA... you@example.com
-
     # --- Docker host (LXC 200) ---
-    docker_host_ip: "YOUR_DOCKER_HOST_IP"  # e.g. 192.168.1.222
+    docker_host_ip: "YOUR_DOCKER_HOST_IP"  # stable Tailscale address or MagicDNS
     docker_compose_dir: "/opt/docker"
     media_data_path: "/data/media"
-
-    # LXC IPs default to DHCP (see group_vars/all.yml lxc_containers).
-    # LXC 200 gets a static IP from docker_host_ip above; LXC 103 (valheim)
-    # has a static example IP in group_vars — change it to fit your subnet.
 
     # --- VPN ---
     vpn_provider: "mullvad"
@@ -94,9 +82,8 @@ all:
 
     # --- Ollama ---
     ollama_models:
-      - "qwen3.5:35b-a3b"
+      - "qwen3.6:35b-a3b"
       - "qwen3.5:4b"
-      - "gemma4:e4b"
       - "nomic-embed-text"
 
     # --- Homelab API ---
@@ -111,20 +98,14 @@ all:
   children:
     proxmox_nodes:
       hosts:
-        pve:
-          ansible_host: "YOUR_PVE_IP"           # e.g. 192.168.1.10
-          ansible_user: root
-          node_role: gaming
-          gpu_vendor: nvidia
-          gpu_pci_ids: "10de:1f07,10de:10f9,10de:1ada,10de:1adb"
         mediaserver:
-          ansible_host: "YOUR_MEDIASERVER_IP"    # e.g. 192.168.1.20
+          ansible_host: "YOUR_MEDIASERVER_IP"    # stable Tailscale address or MagicDNS
           ansible_user: root
           node_role: media
           das_uuid: "YOUR_DAS_UUID"              # e.g. 7d80ea3f
           das_mount: "/mnt/storage"
         aiserver:
-          ansible_host: "YOUR_AISERVER_IP"       # e.g. 192.168.1.30
+          ansible_host: "YOUR_AISERVER_IP"       # stable Tailscale address or MagicDNS
           ansible_user: admin
           ansible_become_password: "YOUR_ADMIN_PASSWORD"
           node_role: ai
@@ -134,18 +115,18 @@ all:
     docker_hosts:
       hosts:
         lxc200:
-          ansible_host: "YOUR_DOCKER_HOST_IP"    # e.g. 192.168.1.222
+          ansible_host: "YOUR_DOCKER_HOST_IP"    # stable Tailscale address or MagicDNS
           ansible_user: root
 
     ai_hosts:
       hosts:
         lxc102:
-          ansible_host: "YOUR_LXC102_IP"         # e.g. 192.168.1.50
+          ansible_host: "YOUR_LXC102_IP"         # stable Tailscale address or MagicDNS
           ansible_user: root
 
     dev_hosts:
       hosts:
         lxc104:
-          ansible_host: "YOUR_LXC104_IP"         # e.g. 192.168.1.60
+          ansible_host: "YOUR_LXC104_IP"         # stable Tailscale address or MagicDNS
           ansible_user: claude
           ansible_become_password: "YOUR_LXC104_PASSWORD"

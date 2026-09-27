@@ -1,267 +1,184 @@
 # Homelab Blueprint
 
-A three-node Proxmox cluster running media automation, gaming (with GPU passthrough + game streaming), AI/ML workloads, and self-hosted productivity tools — all on consumer hardware.
+A two-node Proxmox homelab running media automation, local AI, agent workspaces,
+and self-hosted productivity tools on consumer hardware.
 
-This repo documents the architecture, services, and lessons learned. No credentials or personal info — just the blueprint.
+This repo documents the architecture, services, and lessons learned. No
+credentials or private account data — just the blueprint.
 
-> **Want to build this yourself?** Start with **[docs/RECREATE.md](docs/RECREATE.md)** —
-> the ordered runbook from bare Proxmox hardware to the full running stack
-> (Proxmox prep → Terraform → Ansible → Docker Compose → verification).
-
----
+**Current-state audit: September 25, 2026.** Inventory was checked against
+Proxmox, running Docker containers, service APIs, and the dashboard. Resource
+sizes below are a snapshot; live configuration remains authoritative.
 
 ## Cluster Overview
 
+```mermaid
+flowchart TB
+    clients[Desktop and mobile] --> access[Tailscale / internal HTTPS]
+    access --> home[Homepage + mobile PWA]
+    home --> media
+    home --> ai
+    subgraph media[MediaServer]
+      docker[LXC 200 · Docker services]
+      das[8 TB btrfs DAS · media and backups]
+      docker --- das
+    end
+    subgraph ai[AIServer]
+      api[Homelab API · React PWA]
+      context[Grimoire · notes and shared context]
+      agents[Lectern · agent sessions and reviews]
+      llm[LXC 102 · Ollama + Open WebUI]
+      research[LXC 105 · ROCm research]
+      desk[LXC 107 · shared browser]
+      api --> llm
+      agents --> desk
+    end
+    ai -->|Restic snapshots| das
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     Proxmox VE Cluster ("HomeServer")                       │
-│                        3 nodes · PVE 9.1.1                                  │
-├──────────────────┬──────────────────────┬───────────────────────────────────┤
-│    Node: pve     │  Node: MediaServer   │     Node: AIServer                │
-│  (Gaming/Dev)    │  (Media Stack Host)  │   (AI/ML Workloads)               │
-│                  │                      │                                   │
-│  CPU: i7-9700K   │  CPU: Ryzen 7 8845HS │  CPU: Ryzen AI MAX+ 395          │
-│  RAM: 32 GB      │  RAM: 28 GB          │  RAM: 128 GB                     │
-│  GPU: RTX 2070*  │  iGPU: Radeon 780M   │  iGPU: Radeon 8060S              │
-│                  │                      │                                   │
-│  ┌────────────┐  │  ┌────────────────┐  │  ┌───────────────────────────┐   │
-│  │ VM 103     │  │  │ LXC 200        │  │  │ LXC 101  Dev Workspace   │   │
-│  │ Bazzite    │  │  │ Docker Host    │  │  │ LXC 102  Ollama + WebUI  │   │
-│  │ Gaming VM  │  │  │ 55+ containers │  │  │ LXC 104  Work Env        │   │
-│  │ 7c/24GB    │  │  │ 12c/24GB       │  │  │ LXC 105  ML Research     │   │
-│  │ through    │  │  │ + nginx SSO    │  │  │                           │   │
-│  │            │  │  │ + SearXNG      │  │  │                           │   │
-│  └────────────┘  │  └────────────────┘  │  ├───────────────────────────┤   │
-│                  │                      │  │ Homelab API   :9105       │   │
-│  * Only GPU in   │  DAS: 8TB btrfs      │  │  └─ AI Agent    │   │
-│    system —      │  (USB TerraMaster)   │  │  └─ Download Guardian    │   │
-│    host goes     │                      │  │  └─ Library Verification │   │
-│    headless      │                      │  │  └─ Diagnostic Tools     │   │
-│    when VM runs  │                      │  │ Ecosystem RAG   :9103    │   │
-│                  │                      │  │ Terraform       :9104    │   │
-│                  │                      │  └───────────────────────────┘   │
-├──────────────────┴──────────────────────┴───────────────────────────────────┤
-│                                                                             │
-│   ┌── AI Agent Brain ──────────────────────────────────────────────────┐    │
-│   │  qwen3.5:35b-a3b on Ollama (native tool calling, 70+ tools)      │    │
-│   │                                                                    │    │
-│   │  Interfaces:                                                       │    │
-│   │    Discord bot (*ai) ──┐                                           │    │
-│   │    Homepage chat ──────┼── /api/ai/agent ── tool loop ── execute  │    │
-│   │    Open WebUI (MCP) ──┘                                           │    │
-│   │                                                                    │    │
-│   │  Subsystems:                                                       │    │
-│   │    Librarr (Go, 13 sources, Torznab/Newznab, OPDS, embedded UI)  │    │
-│   │    Sentinel (Go, download guardian, library verification)         │    │
-│   │    Diagnostics (file ops, log reading, library rescans)           │    │
-│   │    SearXNG (self-hosted web search) ─── Open WebUI + Homepage     │    │
-│   │    Homelab Agent (proactive: 7 modules, 3-tier AI repair,         │    │
-│   │      every 5min, port 9106)                                      │    │
-│   │    Nightly Tests (165+ tests at 5 AM, Discord results)           │    │
-│   └────────────────────────────────────────────────────────────────────┘    │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+
+The old `pve` gaming node was sold in June 2026. Its Bazzite VM and automatic
+Steam/game-streaming pipeline are retired. The game library services remain.
+The [gaming notes](docs/gaming-vm.md) and [pipeline notes](docs/game-pipeline.md)
+are retained as historical references, not the current architecture.
 
 ## Hardware
 
-| Node | CPU | Cores/Threads | RAM | GPU | Role |
-|------|-----|---------------|-----|-----|------|
-| **pve** | Intel i7-9700K | 8c/8t | 32 GB | NVIDIA RTX 2070 (passthrough) | Gaming / dev |
-| **MediaServer** | AMD Ryzen 7 8845HS | 8c/16t | 28 GB | AMD Radeon 780M (iGPU) | Media stack |
-| **AIServer** | AMD Ryzen AI MAX+ 395 | 16c/32t | 128 GB | AMD Radeon 8060S (iGPU) | AI/ML workloads |
+| Node | CPU | Cores / threads | RAM available to host | GPU | Role |
+|------|-----|-----------------|-----------------------|-----|------|
+| **MediaServer** | AMD Ryzen 7 8845HS | 8 / 16 | ~28 GiB | Radeon 780M | Docker services, media, backups |
+| **AIServer** | AMD Ryzen AI MAX+ 395 | 16 / 32 | ~123 GiB | Radeon 8060S | Local inference, research, agents, development |
+
+AIServer has 128 GB installed; available host memory differs from the advertised
+capacity. The iGPU is shared with inference and research LXCs through `/dev/dri`
+and `/dev/kfd`.
 
 ### Storage
 
-- **Boot drives**: Local LVM-thin on each node (~100 GB each)
-- **DAS**: TerraMaster TDAS enclosure, USB-attached to MediaServer, 8 TB btrfs
-  - Mounted at `/mnt/storage` on the MediaServer host
-  - Bind-mounted into LXC 200 at `/mnt/storage` (mp0); inside the container `/data/media` is a symlink to `/mnt/storage/media`
-  - All media services depend on this mount — they won't start if the DAS is disconnected
+- **Media:** an 8 TB btrfs DAS attached to MediaServer, mounted at `/mnt/storage`
+  and passed into LXC 200. `/data/media` resolves to the media tree there.
+- **AIServer root:** a fixed ~112 GiB linear LV. Guest thin-pool free space cannot
+  simply be assigned to it.
+- **Bulk:** a 600 GiB thin LV at `/mnt/bulk` for large projects, caches and
+  recovery data. Monitor the backing thin pool as well as filesystem usage.
+- **Backups:** nightly encrypted Restic snapshots on the DAS, plus a separate
+  cold archive without automatic expiry. Restore checks are part of operations.
 
----
+See [Disaster Recovery](docs/disaster-recovery.md) for coverage and limitations.
 
-## Network Topology
+## Guests
 
-```
-Internet
-  │
-  ├── Cloudflare Tunnel (cloudflared container)
-  │     └── Reverse proxy to select services
-  │
-  ├── Tailscale mesh (node-to-node, stable IPs)
-  │
-  └── LAN (flat /24 network)
-        │
-        ├── pve node
-        │     └── VM 103 (Bazzite) — bridged LAN + Tailscale
-        │
-        ├── MediaServer node
-        │     └── LXC 200 — bridged LAN
-        │           ├── nginx reverse proxy (*.homelab.internal)
-        │           │     └── Authelia SSO (3-tier auth)
-        │           ├── gluetun VPN (Mullvad WireGuard)
-        │           │     ├── qBittorrent
-        │           │     ├── Librarr
-        │           │     └── Gamarr
-        │           ├── dnsmasq (local DNS for *.homelab.internal)
-        │           └── SearXNG (self-hosted web search)
-        │
-        └── AIServer node
-              ├── LXC 100-105 — bridged LAN
-              ├── Homelab API + AI Agent (port 9105)
-              └── MCP server (Proxmox management)
-```
+| VMID | Guest | Node | Resources | Purpose / audit state |
+|------|-------|------|-----------|-----------------------|
+| 100 | media-monitor | AIServer | 4 cores / 8 GiB / 20 GiB disk | Homelab Agent; hostname is historical |
+| 101 | project-env | AIServer | 4 cores / 4 GiB / 30 GiB | Development workspace |
+| 102 | openclaw | AIServer | 16 cores / 44 GiB / 140 GiB | Ollama + Open WebUI, shared AMD GPU |
+| 103 | valheim | AIServer | 4 cores / 6 GiB / 20 GiB | Dedicated game server; stopped at audit |
+| 104 | work-env | AIServer | 4 cores / 4 GiB / 400 GiB | Development tools and Docker |
+| 105 | research-env | AIServer | No core cap / 32 GiB / 500 GiB | ROCm research, shared AMD GPU |
+| 106 | globality-dev | AIServer | 8 cores / 16 GiB / 60 GiB | Interview/development workspace |
+| 107 | agent-desk | AIServer | 4 cores / 6 GiB / 24 GiB | Persistent browser + virtual desktop |
+| 110 | adk-sandbox-tmpl | AIServer | 4 cores / 4 GiB / 30 GiB | Stopped Lectern clone template |
+| 200 | docker-server | MediaServer | 12 cores / 24 GiB / 400 GiB | Main Docker host |
 
-### VPN Architecture
+All listed guests are LXCs. A stopped experimental desktop VM is also retained;
+it is not a required part of the service stack. Guest IDs can be reused: current
+LXC 103 is **not** the old gaming VM, and LXC 106 is **not** the old AI detector.
 
-Download clients (qBittorrent, Librarr, Gamarr) route through a **gluetun** container running Mullvad WireGuard. Services that need VPN protection use `network_mode: "service:gluetun"` in Docker Compose and expose their ports through gluetun.
+## Everyday Access
 
----
+**Homepage** is the desktop launcher, with four tabs:
 
-## AI Assistant
+| Tab | Contents |
+|-----|----------|
+| Overview | Quick access, host health, filesystem space, backups, tests, VPN and plan usage |
+| Media | Libraries, requests, downloads, books and game collections |
+| Tools | Notes, files, job search, AI, automation and productivity |
+| System | Infrastructure, terminals, Proxmox and detailed stats |
 
-The homelab is controlled by a **tool-calling AI agent** powered by local LLMs (qwen3.5:35b-a3b / gemma4:e4b) running on Ollama with GPU-accelerated inference via the AMD 8060S iGPU's GTT unified memory. The agent has **70+ tools** for managing every aspect of the homelab, and hits a **10/10 mean score on the internal eval harness** across a canned set of real-world prompts.
+The **React mobile PWA** provides service links, files, media, chat, activity,
+terminal access, job tools and system information. It uses a tailnet HTTPS
+origin so installation, service workers and share targets work on phones.
 
-On top of the basic tool-calling loop, the stack adds:
+- **Grimoire:** notes, retrieval, shared agent context and credential grants.
+- **Lectern:** agent sessions, tasks, review, approvals and the autonomous workshop.
+- **Agent Desk:** one persistent browser that both the user and agents can see.
+- **Capture:** links and notes go to Grimoire, files to Seafile, documents to Paperless.
+- **Formwork:** job-search workspace and reviewable applications.
 
-- **Semantic tool routing** — embedding-similarity hybrid replaces keyword matching (catches "prove it" → `verify_in_library`)
-- **Episodic memory** — summaries of past conversations are embedded and retrieved on new messages, so context persists across sessions and interfaces
-- **LLM observability** — every Ollama call traced to SQLite with latency / token / tool-success metadata, visible in the PWA
-- **Code execution sandbox** — `execute_code` tool runs Python in a hardened bubblewrap namespace (no network, 5s CPU, 512MB RAM, fs-isolated)
-- **Ecosystem RAG** — one vector index over the whole homelab (docs, media, infra/compose, notes, projects, git, inventory) with hybrid dense+keyword retrieval, LLM rerank, incremental indexing, and per-source visibility tiers
-- **Tier 2 verify step** — after the smart fixer declares a fix, syntax/container-health/LLM-judge checks run; any failure reverts file edits from backups
-- **Eval harness** — canned prompts + LLM judge nightly, with a regression gate in the nightly test suite
+See [Dashboard](docs/dashboard.md) for layout, link rules and maintenance.
 
-A proactive **Homelab Agent** with 7 modules scans every 5 minutes and uses a **3-tier AI repair system** (qwen3.5:4b fast tools → qwen3.5:35b smart fixer with verify → Claude Code backstop) to autonomously detect and fix issues.
+## Network
 
-### How It Works
+Hosts and guests use DHCP; stable inter-service addresses come from Tailscale
+or MagicDNS. LAN addresses are configuration, not constants copied into apps.
+LXC 200 and the managed switch have DHCP reservations.
 
-```
-User (Discord / Homepage / Open WebUI)
-  └── /api/ai/agent
-        └── LLM decides which tools to call
-              └── Executes against homelab APIs
-                    └── Feeds results back to LLM
-                          └── Generates natural language response
-```
+- **Internal browser access:** nginx + Authelia at `*.homelab.internal`, with
+  a local certificate authority.
+- **Mobile access:** tailnet-only HTTPS with a publicly trusted certificate.
+- **Public access:** only services explicitly configured in the Cloudflare tunnel.
+- **Downloads:** qBittorrent, Librarr and Gamarr share Gluetun's Mullvad namespace.
+- **Quorum:** a two-node cluster needs both votes; plan a QDevice if independent
+  node maintenance is required.
 
-### Interfaces
+[Networking](docs/networking.md) covers DNS, auth boundaries and iframe origins.
 
-All three interfaces share the same agent brain:
+## AI & Automation
 
-| Interface | How | Use Case |
-|-----------|-----|----------|
-| **Discord bot** | `*ai <anything>` command | Mobile / quick commands |
-| **Homepage widget** | Floating chat bubble (custom.js) | Dashboard integration |
-| **Open WebUI** | MCP tools proxy | Full chat UI with history |
+Local inference runs on Ollama in LXC 102. The Homelab API routes tools, calls
+services and streams results to the PWA and Homepage; Discord has a restricted
+surface. A separate Homelab Agent in LXC 100 monitors and repairs the estate.
 
-### Key Subsystems
+The stack includes semantic tool routing, episodic memory, LLM traces, document
+retrieval, a constrained code sandbox, and escalation to coding agents. Grimoire
+provides shared context; Doc RAG indexes documents, service catalogs and project
+configuration. Model upgrades are tested against actual tool-use scenarios.
 
-| System | Purpose |
-|--------|---------|
-| **Librarr** | Go binary (17 MB), 13 search sources, Torznab/Newznab API, OPDS feed, Usenet/SABnzbd, modern Tailwind dark UI, series grouping, wishlist |
-| **Sentinel** | Go binary (11 MB), download guardian with SQLite persistence, definitive library verification |
-| **Homelab Agent** | Proactive monitoring (5min), 7 modules (container doctor, source intelligence, import watchdog, torrent doctor, system monitor, notifications, AI escalation), 3-tier repair system, failure memory |
-| **Diagnostic Tools** | File ops, log reading, permission fixes, library rescans — for AI escalation |
-| **SearXNG** | Self-hosted web search for AI agent, Homepage, Open WebUI |
-| **Paperless Tagging** | AI-driven document tagging and correspondent assignment |
-| **Gamarr** | Go binary, game/ROM search + download (Prowlarr/Myrient/Vimm), torrent completion watcher, OIDC/SSO, TOTP 2FA, invite codes, Bazzite VM sync |
-| **Nightly Tests** | 165+ end-to-end tests at 5 AM (~10 min), Discord results notification |
+There is no blanket “10/10” reliability claim: old tiny prompt sets did not
+measure the range of real tasks. The current capability harness grades outcomes
+in a simulated homelab, separately reports safety violations, and requires
+repeated runs for model comparisons.
 
-See [AI Stack](docs/ai-stack.md) for full details.
+Details: [AI Stack](docs/ai-stack.md), [Automation](docs/automation.md),
+[Monitoring](docs/monitoring.md).
 
----
+## Documentation & Examples
 
-## Guests (VMs & Containers)
+| Document | Contents |
+|----------|----------|
+| [Docker Services](docs/docker-services.md) | Current media, productivity and infrastructure services |
+| [Media Stack](docs/media-stack.md) | Requests, downloads, imports and libraries |
+| [Dashboard](docs/dashboard.md) | Desktop/mobile entry points and refresh procedure |
+| [AI Stack](docs/ai-stack.md) | Local models, agents, context and evaluation |
+| [Automation](docs/automation.md) | Watchdogs, repair, capture and backups |
+| [Monitoring](docs/monitoring.md) | Metrics, health checks and known blind spots |
+| [Networking](docs/networking.md) | DHCP, Tailscale, VPN, DNS and HTTPS |
+| [Disaster Recovery](docs/disaster-recovery.md) | Recovery order, archive policy and restore verification |
+| [Lessons Learned](docs/lessons-learned.md) | Debugging notes and operational lessons |
+| [Terraform](terraform/) | Container shell examples; not a full recovery system |
+| [Ansible](ansible/) | Earlier provisioning scaffold; coverage and limitations documented |
+| [Compose example](docker-compose.example.yml) | Selected Docker patterns; not an export of production |
 
-| VMID | Name | Node | Type | Resources | Purpose |
-|------|------|------|------|-----------|---------|
-| 100 | homelab-agent | AIServer | LXC | 4c / 8 GB | Self-healing Homelab Agent (7 modules, 3-tier AI repair, port 9106) |
-| 101 | project-env | AIServer | LXC | 4c / 4 GB | Development workspace |
-| 102 | openclaw | AIServer | LXC | 16c / 44 GB | Local LLM chat (Ollama + Open-WebUI), iGPU passthrough |
-| 103 | gaming-bazzite | pve | VM | 7c / 24 GB | Gaming VM with GPU passthrough |
-| 103 | valheim | AIServer | LXC | 4c / 6 GB | Valheim dedicated server (static LAN IP) |
-| 104 | work-env | AIServer | LXC | 4c / 4 GB | Claude Code, Docker, dev tools (nesting + keyctl) |
-| 105 | research-env | AIServer | LXC | all cores / 32 GB | AI/ML research with GPU passthrough (gfx1151, PyTorch ROCm) |
-| 200 | docker-server | MediaServer | LXC | 12c / 24 GB | Main Docker host (55+ containers), DAS bind mount |
-
----
-
-## Documentation
-
-| Doc | Description |
-|-----|-------------|
-| [**Recreate the Stack**](docs/RECREATE.md) | **Ordered rebuild runbook** — Proxmox prep, Terraform, Ansible, compose bring-up, all required secrets, verification checklist |
-| [Docker Services](docs/docker-services.md) | All 55+ containers running on LXC 200 |
-| [Gaming VM](docs/gaming-vm.md) | Bazzite setup, GPU passthrough, Sunshine/Moonlight streaming |
-| [Game Pipeline](docs/game-pipeline.md) | Automated game download → install → Steam library pipeline |
-| [AI Stack](docs/ai-stack.md) | Tool-calling agent, Download Guardian, verification, diagnostics, RAG, SearXNG, Homelab Agent, nightly tests |
-| [Automation](docs/automation.md) | Download Guardian, Homelab Agent, backups, nightly tests, CrowdSec, Terraform, dual-channel alerts |
-| [Disaster Recovery](docs/disaster-recovery.md) | Full rebuild runbook — the four recovery layers (Terraform / restic / GitHub / manual), backup inventory, restore order, gaps |
-| [Monitoring](docs/monitoring.md) | Homelab Agent (7 modules, 3-tier AI repair), n8n watchdog workflows, Homepage dashboard, storage monitoring |
-| [Media Stack](docs/media-stack.md) | Jellyfin, *arr apps, download automation |
-| [Networking](docs/networking.md) | VPN, Cloudflare tunnel, Tailscale mesh, nginx + Authelia SSO |
-| [Lessons Learned](docs/lessons-learned.md) | Gotchas, debugging tips, things that broke |
-| [Terraform IaC](terraform/) | LXC/VM shell provisioning (bpg/proxmox); in-guest convergence is Ansible's job |
-| [Ansible](ansible/) | In-guest software/config convergence (roles, inventory, playbook) |
-| [Docker Compose (example)](docker-compose.example.yml) | Sanitized compose file |
-
----
-
-## Quick Stats
-
-- **8 guests** across 3 nodes (7 LXC + 1 VM)
-- **55+ Docker containers** on a single LXC
-- **~188 GB total RAM** across the cluster
-- **8 TB DAS** for media storage
-- **GPU passthrough** on 2 nodes (NVIDIA for gaming, AMD iGPU shared across 3 LXCs for ML)
-- **AI tool-calling agent** — 70+ tools, local LLMs (qwen3.5:35b-a3b + gemma4:e4b), GPU-accelerated via GTT unified memory, **10/10 stable on internal eval harness**
-- **Semantic tool routing** — embedding-similarity tool retrieval (catches paraphrases the old keyword router missed); hybrid with keyword hits as a baseline floor
-- **Episodic memory** — past chats are summarized + embedded + retrieved cross-interface, so the assistant remembers context between Discord, PWA, and Open WebUI sessions
-- **LLM observability** — SQLite trace of every Ollama call (latency/tokens/tool success/errors); real-time stats rendered on the mobile PWA
-- **Code execution sandbox** — Python/bash tool runs in a bubblewrap-isolated namespace (no network, fs-isolated, resource-capped, timeout-enforced)
-- **Ecosystem RAG** — ~14 pluggable source connectors (docs, media, infra/compose, Proxmox, notes, projects, git, inventory) into one collection; hybrid dense+BM25 retrieval with RRF + LLM rerank + query routing; incremental hash-based reindex; tiered visibility (`public`/`lan`/`admin`) gated per surface (host API / MCP / Homepage `/chat` / Discord `*ask`)
-- **Tier 2 verify step** — smart fixer's fixes are independently validated (syntax / container health / LLM judge); file edits auto-revert from backup on failure
-- **Eval harness** — 10 canned prompts replayed nightly with LLM judge scoring, SQLite history, regression gate in nightly tests
-- **4 agent interfaces** — Discord bot, Homepage chat widget, mobile PWA, Open WebUI (same brain, same tools)
-- **Librarr (Go)** — 18 MB binary, 13 search sources, Torznab/Newznab API, OPDS feed, Usenet/SABnzbd, multi-user with TOTP 2FA + OIDC/SSO, modern dark Tailwind UI with series grouping and wishlist
-- **Sentinel (Go)** — 11 MB binary, download guardian with SQLite persistence, definitive library verification (Jellyfin/ABS/Kavita/Sonarr/Radarr)
-- **Homelab Agent** — proactive monitoring every 5min, 7 modules (container doctor, source intelligence, import watchdog, torrent doctor, system monitor, notifications, AI escalation), 3-tier AI repair system, failure memory (SQLite)
-- **Service integrations** — Mealie recipe import, Changedetection URL watches, Linkwarden bookmarks, AI auto-tagging for Paperless, Docker container control (restart/stop/start)
-- **Self-hosted notes + scratchpad** — SilverBullet Markdown notebook (`notes.homelab.internal`, wikilinks/backlinks/full-text search) and a disposable mini-app host (`lab.homelab.internal`, single-binary Go static+KV server); both installable PWAs
-- **165+ nightly tests** — comprehensive end-to-end tests at 5 AM, covers all services + smart fixer + escalation + AI stack (traces/memory/sandbox/RAG/evals/semantic routing), plus an eval-score regression gate; 128 unit tests across homelab-api/doc-rag/homelab-agent, Discord results notification
-- **SearXNG** — self-hosted web search for AI agent, Homepage dashboard, Open WebUI
-- **Diagnostic toolkit** — file ops, log reading, permission fixes, library rescans for AI escalation
-- **Unified API** — single FastAPI endpoint aggregating all services (Swagger docs included)
-- **Automated backups** — Restic to DAS, 4 nodes, daily, encrypted, deduplicated
-- **SSO reverse proxy** — nginx + Authelia, 36 subdomains on `*.homelab.internal`, 3-tier auth (true SSO / gate / passthrough), self-signed wildcard cert, dnsmasq for LAN + Tailscale split DNS for remote
-- **CrowdSec IPS** — 1400+ malicious IPs blocked at firewall, community threat intel
-- **Terraform IaC** — cluster LXC/VM shells defined as code ([`terraform/`](terraform), bpg/proxmox provider, importable state); in-guest convergence is Ansible's job
-- **9 n8n workflows** — dual-channel Discord alerts, watchdogs, health checks
-- **AI self-healing** — consolidated Homelab Agent with 3-tier repair (4b fast tools → 35b smart fixer → Claude Code backstop) auto-fixes containers, torrents, VPN, permissions, imports, configs
-- **Dual-channel Discord alerts** — all watchdogs and bots report to both Discord servers
-- **Zero cloud dependencies** — everything self-hosted (except Cloudflare tunnel for external access)
-
----
+Templates are deliberately sanitized. Review them against your own hardware,
+authentication and storage before running them. None of these files contains
+production Terraform state or private service credentials.
 
 ## Open Source Projects
 
-Custom Go services built for this homelab, available as standalone projects:
-
-| Project | Language | Description |
-|---------|----------|-------------|
-| [Librarr](https://github.com/JeremiahM37/librarr) | Go | Book/audiobook/manga search + download, 13 sources, Torznab API, OPDS feed |
-| [Sentinel](https://github.com/JeremiahM37/sentinel) | Go | Download guardian with library verification (Jellyfin/ABS/Kavita/Sonarr/Radarr) |
-| [Gamarr](https://github.com/JeremiahM37/gamarr) | Go | Game/ROM search + download, 24 platforms, 3 sources, OIDC/SSO, TOTP 2FA, torrent watcher, 43 e2e tests |
-| [gpu-graph-mcp](https://github.com/JeremiahM37/gpu-graph-mcp) | C11 | Zero-dependency MCP server indexing live GPU/accelerator state as a queryable knowledge graph (NVIDIA + AMD), cutting token cost vs. parsing `nvidia-smi`/`rocm-smi` |
-| [mttyd](https://github.com/JeremiahM37/mttyd) | JS/HTML | Mobile-friendly ttyd wrapper — xterm.js terminal PWA with on-screen keybar and history suggestions |
-| [pocketlab](https://github.com/JeremiahM37/pocketlab) | Python | Generalized mobile PWA host extracted from this homelab's dashboard/terminal stack |
-| [verify](https://github.com/JeremiahM37/verify) | Python | CLI that runs a project's tests + service/endpoint/log checks + a real headless-browser UI flow before declaring a change "done" |
-| [strix-halo-sglang](https://github.com/JeremiahM37/strix-halo-sglang) | Docker | SGLang inference stack for AMD Strix Halo (gfx1151) |
-| [Homelab Blueprint](https://github.com/JeremiahM37/homelab-blueprint) | Docs | This repo — architecture documentation |
-
----
+| Project | Purpose |
+|---------|---------|
+| [Librarr](https://github.com/JeremiahM37/librarr) | Books, audiobooks and manga |
+| [Sentinel](https://github.com/JeremiahM37/sentinel) | Download tracking and library verification |
+| [Gamarr](https://github.com/JeremiahM37/gamarr) | Game and ROM libraries |
+| [Grimoire](https://github.com/JeremiahM37/grimoire) | Personal context server |
+| [Lectern](https://github.com/JeremiahM37/lectern) | Agent mission control, formerly AgentDeck |
+| [Formwork](https://github.com/JeremiahM37/formwork) | Reviewable job applications |
+| [homelab-ai](https://github.com/JeremiahM37/homelab-ai) | Public monitoring/orchestration package; distinct from the private deployment |
+| [gpu-graph-mcp](https://github.com/JeremiahM37/gpu-graph-mcp) | GPU state over MCP |
+| [mttyd](https://github.com/JeremiahM37/mttyd) | Mobile terminal wrapper |
+| [pocketlab](https://github.com/JeremiahM37/pocketlab) | Portable mobile dashboard |
+| [verify](https://github.com/JeremiahM37/verify) | Tests, endpoint checks and browser verification |
+| [strix-halo-sglang](https://github.com/JeremiahM37/strix-halo-sglang) | Inference experiments on AMD Strix Halo |
 
 ## License
 

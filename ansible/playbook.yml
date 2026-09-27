@@ -1,7 +1,8 @@
 ---
 # Homelab Blueprint — Main Playbook
 #
-# Full deploy:
+# Scaffold only — review README.md before use. Syntax-checked, not recovery-tested.
+# Example invocation:
 #   ansible-playbook playbook.yml
 #
 # Specific components:
@@ -23,7 +24,7 @@
   roles:
     - common
 
-# ── Step 2: GPU passthrough (pve + AIServer) ──
+# ── Step 2: GPU passthrough (AIServer) ──
 - name: GPU passthrough configuration
   hosts: proxmox_nodes
   tags: [gpu]

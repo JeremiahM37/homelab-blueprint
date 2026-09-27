@@ -10,7 +10,7 @@ Hard-won knowledge from building and maintaining this homelab. Sorted by categor
 - **All PCI functions must be passed.** For NVIDIA GPUs, that's typically 4 functions: video, audio, USB controller, serial bus. Miss one and the guest may not initialize the GPU.
 - **Update initramfs after any VFIO change.** `update-initramfs -u -k all && update-grub && reboot` — forgetting this is the most common reason passthrough "doesn't work."
 
-## Game Streaming (Sunshine/Moonlight)
+## Game Streaming (historical: retired gaming host)
 
 - **KMS vs X11 capture matters.** On gamescope (SteamOS/Bazzite), the Xwayland root framebuffer can be black even while games render fine. `capture=x11` will give you a black screen with just a cursor. Always use `capture=kms`.
 - **Two different failure modes.** `503 failed to initialize video capture` = display/DPMS issue (fixable by toggling connector). Black screen + cursor = wrong capture backend (must force KMS).
@@ -29,7 +29,7 @@ Hard-won knowledge from building and maintaining this homelab. Sorted by categor
 
 ## Download Clients
 
-- **IPFS gateways are unreliable.** Cloudflare-IPFS, gateway.ipfs.io, Pinata — all return 403 or timeout. Use direct download links (LibGen mirrors) instead.
+- **Old fallback recipes expire.** IPFS and LibGen-mirror workarounds in historical notes are not evidence those services still work; verify source health rather than retrying them indefinitely.
 - **Seeder counts lie.** Some indexers (especially LimeTorrents) inflate seeder counts. Verify with multiple sources or check actual connected peers in qBittorrent.
 - **Magnet links from bare info_hash have no trackers.** They rely on DHT which is slow. Add announce URLs manually for faster peer discovery.
 - **Share ratio limits can delete active downloads.** If qBit's ratio limit is set to auto-remove, it can delete a torrent + files that haven't finished downloading. Check your ratio settings.
@@ -37,7 +37,7 @@ Hard-won knowledge from building and maintaining this homelab. Sorted by categor
 
 ## Book Pipeline
 
-- **Anna's Archive download flow has specific steps.** Search → `ads.php?md5=...` → extract `get.php` link → direct download. Don't try to use `file.php` (IPFS only, broken).
+- **A source must report failure honestly.** Returning an empty success after every search variant fails keeps health green while users get nothing. Record errors and open the circuit.
 - **Web novel scraping works best with `--all --single`.** This produces a single EPUB file with all chapters, instead of one file per chapter.
 
 ## Proxmox
@@ -56,7 +56,7 @@ Hard-won knowledge from building and maintaining this homelab. Sorted by categor
 
 ## AMD GPU / ROCm
 
-- **Nightly wheels may be required for new GPUs.** The Radeon 8060S (gfx1151) only works with ROCm nightly builds, not stable releases.
+- **Match the exact GPU and software build.** Early gfx1151 bring-up required nightly wheels; that historical workaround is not a permanent rule about current ROCm releases.
 - **No HSA_OVERRIDE_GFX_VERSION needed** with native nightly kernels. If you find yourself setting this, you're probably using the wrong PyTorch build.
 - **Ollama checks MemFree, not MemAvailable.** Large models may refuse to load even with plenty of reclaimable memory. Drop caches first: `echo 3 > /proc/sys/vm/drop_caches`.
 
@@ -66,3 +66,24 @@ Hard-won knowledge from building and maintaining this homelab. Sorted by categor
 - **DHCP IPs change on reboot.** Use Tailscale for stable addressing to VMs that don't have static IPs.
 - **Wake-on-LAN is worth configuring.** Saves you a physical trip to power on a machine after maintenance.
 - **Anti-bot JavaScript on some sites can't be bypassed server-side.** Vimm.net's protection requires real browser JS execution. Use alternative sources (Myrient) instead.
+
+
+## September operational lessons
+
+- **Monitor filesystems, not physical-disk percentages.** A small root LV can
+  fill while its NVMe looks empty. Check the thin pool separately too.
+- **DHCP and stable names beat copied LAN addresses.** A subnet move broke hosts
+  and containers before Tailscale could establish a route. Resolver state can
+  also be overwritten by a DHCP renewal.
+- **HTTP 200 is not a working UI.** A login redirect, blank mixed-content iframe
+  or a `NaN` widget can all sit behind a healthy HTTP response.
+- **A port is not a page.** Doc RAG's browser Q&A is `/chat`; its root describes
+  the API. The Homelab Agent has no dashboard at its bare root.
+- **Same-site cookies matter for embeds.** Proxmox's iframe login must share
+  the site's origin family. A cross-site form can appear to work and then loop.
+- **A symlink is not backup coverage.** Restic does not traverse directory
+  symlinks. Explicitly include bulk-volume paths after relocation.
+- **Archive first, restore-test second, reclaim last.** Keep the cold repository
+  outside automatic retention when it contains the only copy.
+- **Version labels and tiny evals are insufficient.** Test actual tool use over
+  repeated runs before changing the model server.

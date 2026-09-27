@@ -1,5 +1,10 @@
 # Game Pipeline
 
+> **Historical reference — retired June 2026.** The gaming node was sold.
+> This is not an active deployment or a current rebuild plan. VMID 103 is now
+> used by a different LXC; do not apply these IDs or addresses to the live cluster.
+> See the [current architecture](../README.md).
+
 Automated pipeline that downloads games and ROMs, syncs them to the gaming VM, extracts/installs them, and adds them to the Steam library — all hands-off after the initial search.
 
 ---

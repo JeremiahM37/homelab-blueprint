@@ -1,0 +1,20 @@
+backend: web
+launch:
+  url: about:blank
+options:
+  web:
+    headless: true
+steps:
+  - name: documentation links and example YAML
+    actions:
+      - shell: python3 scripts/check_blueprint.py
+  - name: Terraform syntax and provider schema (no plan or apply)
+    actions:
+      - shell: terraform -chdir=terraform fmt -check
+      - shell: terraform -chdir=terraform validate -no-color
+  - name: Ansible syntax (no host connection)
+    actions:
+      - shell: cd ansible && uv tool run --from ansible-core ansible-playbook -i inventory.example.yml playbook.yml --syntax-check
+  - name: patch whitespace
+    actions:
+      - shell: git diff --check
